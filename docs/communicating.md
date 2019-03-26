@@ -9,7 +9,7 @@ To start communicating with a client your plugin must implement the init functio
 ```javascript
 class extends FlipperPlugin {
   static title = "MyPlugin";
-  static id = "MyPlugin";
+  static id = 'MyPlugin';
 
   init() {
     // Setup subscriptions etc using this.client
@@ -29,7 +29,7 @@ this.client.call('methodName', DATA).then(res => {
 });
 ```
 
-This function returns a promise so that you can await a potential response from the client. If you are calling a method on the client but don't expect a response then you should instead opt for using the `send()` function.
+This function return as promise so that you can await a potential response from the client. If you are calling a method on the client but don't expect a response then you should instead opt for using the `send()` function.
 
 ```javascript
 this.client.send('methodName', DATA);

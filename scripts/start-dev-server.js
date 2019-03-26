@@ -26,7 +26,6 @@ function launchElectron({bundleURL, electronURL}) {
   const args = [
     path.join(STATIC_DIR, 'index.js'),
     '--remote-debugging-port=9222',
-    ...process.argv,
   ];
 
   const proc = child.spawn(electronBinary, args, {
@@ -63,9 +62,6 @@ function startMetroServer(app) {
         'index.js',
       ),
     },
-    resolver: {
-      blacklistRE: /\/(sonar|flipper)\/dist\//,
-    },
     watch: true,
   }).then(metroBundlerServer => {
     app.use(metroBundlerServer.processRequest.bind(metroBundlerServer));
@@ -80,13 +76,6 @@ function startAssetServer(port) {
       delete knownErrors[req.url];
       outputScreen();
     }
-    next();
-  });
-
-  app.use((req, res, next) => {
-    res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-    res.header('Expires', '-1');
-    res.header('Pragma', 'no-cache');
     next();
   });
 

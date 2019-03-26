@@ -83,6 +83,9 @@ const RootColumn = styled(FlexColumn)({
 });
 
 export default class extends FlipperPlugin<SharedPreferencesState> {
+  static title = 'Shared Preferences Viewer';
+  static id = 'Preferences';
+
   state = {
     selectedPreferences: null,
     sharedPreferences: {},
@@ -104,7 +107,7 @@ export default class extends FlipperPlugin<SharedPreferencesState> {
       const change = event.change;
       const entry = state.sharedPreferences[change.preferences];
       if (entry == null) {
-        return state;
+        return;
       }
       if (change.deleted) {
         delete entry.preferences[change.name];

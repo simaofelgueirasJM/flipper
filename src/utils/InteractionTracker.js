@@ -5,7 +5,7 @@
  * @format
  */
 
-import {getInstance as getLogger} from '../fb-stubs/Logger';
+import Logger from '../fb-stubs/Logger.js';
 
 export function reportInteraction(
   componentType: string,
@@ -16,6 +16,7 @@ export function reportInteraction(
 }
 
 class InteractionTracker {
+  static logger = new Logger();
   static numberOfInteractions = 0;
 
   type: string;
@@ -28,7 +29,7 @@ class InteractionTracker {
   }
 
   interaction = (name: string, data: any) => {
-    getLogger().track('usage', 'interaction', {
+    InteractionTracker.logger.track('usage', 'interaction', {
       interaction: InteractionTracker.numberOfInteractions++,
       type: this.type,
       id: this.id,

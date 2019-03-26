@@ -8,41 +8,29 @@
 import React from 'react';
 import {FlexColumn, FlexRow} from 'flipper';
 import {connect} from 'react-redux';
+import {toggleBugDialogVisible} from './reducers/application.js';
 import WelcomeScreen from './chrome/WelcomeScreen.js';
 import TitleBar from './chrome/TitleBar.js';
 import MainSidebar from './chrome/MainSidebar.js';
 import BugReporterDialog from './chrome/BugReporterDialog.js';
 import ErrorBar from './chrome/ErrorBar.js';
-import ShareSheet from './chrome/ShareSheet.js';
 import PluginContainer from './PluginContainer.js';
-import Sheet from './chrome/Sheet.js';
-import {ipcRenderer, remote} from 'electron';
-import PluginDebugger from './chrome/PluginDebugger.js';
-import {
-  ACTIVE_SHEET_BUG_REPORTER,
-  ACTIVE_SHEET_PLUGIN_DEBUGGER,
-  ACTIVE_SHEET_SHARE_DATA,
-} from './reducers/application.js';
+import {ipcRenderer} from 'electron';
 
-import type {Logger} from './fb-interfaces/Logger.js';
+import type Logger from './fb-stubs/Logger.js';
 import type BugReporter from './fb-stubs/BugReporter.js';
 import type BaseDevice from './devices/BaseDevice.js';
-import type {ActiveSheet} from './reducers/application.js';
 
-const version = remote.app.getVersion();
-
-type OwnProps = {|
+type Props = {
   logger: Logger,
   bugReporter: BugReporter,
-|};
-
-type Props = {|
-  ...OwnProps,
   leftSidebarVisible: boolean,
+  bugDialogVisible: boolean,
+  pluginManagerVisible: boolean,
   selectedDevice: ?BaseDevice,
   error: ?string,
-  activeSheet: ActiveSheet,
-|};
+  toggleBugDialogVisible: (visible?: boolean) => any,
+};
 
 export class App extends React.Component<Props> {
   componentDidMount() {
@@ -59,30 +47,18 @@ export class App extends React.Component<Props> {
     ipcRenderer.send('getLaunchTime');
     ipcRenderer.send('componentDidMount');
   }
-
-  getSheet = (onHide: () => mixed) => {
-    if (this.props.activeSheet === ACTIVE_SHEET_BUG_REPORTER) {
-      return (
-        <BugReporterDialog
-          bugReporter={this.props.bugReporter}
-          onHide={onHide}
-        />
-      );
-    } else if (this.props.activeSheet === ACTIVE_SHEET_PLUGIN_DEBUGGER) {
-      return <PluginDebugger onHide={onHide} />;
-    } else if (this.props.activeSheet === ACTIVE_SHEET_SHARE_DATA) {
-      return <ShareSheet onHide={onHide} />;
-    } else {
-      // contents are added via React.Portal
-      return null;
-    }
-  };
-
   render() {
     return (
       <FlexColumn grow={true}>
-        <TitleBar version={version} />
-        <Sheet>{this.getSheet}</Sheet>
+        <TitleBar />
+        {this.props.bugDialogVisible && (
+          <BugReporterDialog
+            bugReporter={this.props.bugReporter}
+            close={() => {
+              this.props.toggleBugDialogVisible(false);
+            }}
+          />
+        )}
         <FlexRow grow={true}>
           {this.props.leftSidebarVisible && <MainSidebar />}
           {this.props.selectedDevice ? (
@@ -96,15 +72,18 @@ export class App extends React.Component<Props> {
     );
   }
 }
-
-export default connect<Props, OwnProps, _, _, _, _>(
+export default connect(
   ({
-    application: {leftSidebarVisible, activeSheet},
+    application: {pluginManagerVisible, bugDialogVisible, leftSidebarVisible},
     connections: {selectedDevice, error},
   }) => ({
+    pluginManagerVisible,
+    bugDialogVisible,
     leftSidebarVisible,
     selectedDevice,
-    activeSheet,
     error,
   }),
+  {
+    toggleBugDialogVisible,
+  },
 )(App);

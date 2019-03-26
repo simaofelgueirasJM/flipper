@@ -1,9 +1,11 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
+/*
+ *  Copyright (c) 2018-present, Facebook, Inc.
  *
- * This source code is licensed under the MIT license found in the LICENSE
- * file in the root directory of this source tree.
+ *  This source code is licensed under the MIT license found in the LICENSE
+ *  file in the root directory of this source tree.
+ *
  */
+
 package com.facebook.flipper.plugins.inspector.descriptors;
 
 import static com.facebook.flipper.plugins.inspector.InspectorValue.Type.Color;
@@ -14,6 +16,9 @@ import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.support.v4.view.MarginLayoutParamsCompat;
+import android.support.v4.view.ViewCompat;
+import android.support.v4.view.accessibility.AccessibilityNodeInfoCompat;
 import android.util.SparseArray;
 import android.view.Gravity;
 import android.view.View;
@@ -24,9 +29,6 @@ import android.view.ViewGroup.MarginLayoutParams;
 import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import androidx.core.view.MarginLayoutParamsCompat;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import com.facebook.flipper.core.ErrorReportingRunnable;
 import com.facebook.flipper.core.FlipperDynamic;
 import com.facebook.flipper.core.FlipperObject;
@@ -93,15 +95,11 @@ public class ViewDescriptor extends NodeDescriptor<View> {
       CharSequence name = nodeInfo.getClassName();
       nodeInfo.recycle();
 
-      if (name != null && name != "") {
+      if (name != null) {
         return name.toString();
       }
     }
-
-    // A node may have no name if a custom role description was set, but no
-    // role, or if the AccessibilityNodeInfo could not be generated. If this is
-    // the case name just give this node a generic name.
-    return "AccessibilityNode";
+    return "NULL NODEINFO OR CLASSNAME";
   }
 
   @Override
@@ -402,9 +400,6 @@ public class ViewDescriptor extends NodeDescriptor<View> {
         break;
       case "selected":
         node.setSelected(value.asBoolean());
-        break;
-      case "enabled":
-        node.setEnabled(value.asBoolean());
         break;
     }
     invalidateAX(node);

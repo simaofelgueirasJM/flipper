@@ -8,9 +8,8 @@
 import Server from '../server.js';
 
 import type {Store} from '../reducers/index.js';
-import type {Logger} from '../fb-interfaces/Logger.js';
+import type Logger from '../fb-stubs/Logger.js';
 import type Client from '../Client.js';
-import type {UninitializedClient} from '../UninitializedClient';
 
 export default (store: Store, logger: Logger) => {
   const server = new Server(logger, store);
@@ -21,13 +20,6 @@ export default (store: Store, logger: Logger) => {
       type: 'NEW_CLIENT',
       payload: client,
     });
-    // Wait 2 seconds, and then trigger another event so we can check it's displayed
-    setTimeout(() => {
-      store.dispatch({
-        type: 'NEW_CLIENT_SANITY_CHECK',
-        payload: client,
-      });
-    }, 2000);
   });
 
   server.addListener('removed-client', (id: string) => {
@@ -37,12 +29,7 @@ export default (store: Store, logger: Logger) => {
     });
     store.dispatch({
       type: 'CLEAR_PLUGIN_STATE',
-      payload: {
-        id,
-        devicePlugins: new Set([
-          ...store.getState().plugins.devicePlugins.keys(),
-        ]),
-      },
+      payload: id,
     });
   });
 
@@ -58,36 +45,7 @@ export default (store: Store, logger: Logger) => {
     });
   });
 
-  server.addListener('start-client-setup', (client: UninitializedClient) => {
-    store.dispatch({
-      type: 'START_CLIENT_SETUP',
-      payload: client,
-    });
+  window.addEventListener('beforeunload', () => {
+    server.close();
   });
-
-  server.addListener(
-    'finish-client-setup',
-    (payload: {client: UninitializedClient, deviceId: string}) => {
-      store.dispatch({
-        type: 'FINISH_CLIENT_SETUP',
-        payload: payload,
-      });
-    },
-  );
-
-  server.addListener(
-    'client-setup-error',
-    (payload: {client: UninitializedClient, error: Error}) => {
-      store.dispatch({
-        type: 'CLIENT_SETUP_ERROR',
-        payload: payload,
-      });
-    },
-  );
-
-  if (typeof window !== 'undefined') {
-    window.addEventListener('beforeunload', () => {
-      server.close();
-    });
-  }
 };

@@ -7,18 +7,13 @@ case "$(uname)" in
 esac
 
 if ! jq --version > /dev/null; then
-  if $darwin; then
-    echo -e "jq is not installed! Should the script install it for you? (y/n) \\c"
-    read -r REPLY
-    if [ "$REPLY" = "y" ]; then
+   echo -e "jq is not installed! Should the script install it for you? (y/n) \\c"
+   read -r REPLY
+   if [ "$REPLY" = "y" ]; then
       brew install jq
     else
       exit 1
-    fi
-  else
-    echo >&2 "jq is not installed. Please install it using your platform's package manager (apt-get, yum, pacman, etc.)."
-    exit 1
-  fi
+   fi
 fi
 
 echo "Checking for any uncommitted changes..."
@@ -27,7 +22,7 @@ echo "$CHANGES"
 
 if [ ! -z "$CHANGES" ];
 then
-    echo "There are uncommitted changes, either commit or revert them."
+    echo "There are uncommitted changes, either commit it or revert them."
     exit 1
 fi
 
@@ -43,12 +38,8 @@ FLIPPERKIT_VERSION_TAG='flipperkit_version'
 OLD_VERSION_POD_ARG=$(< "$FLIPPER_PODSPEC_PATH" grep "$FLIPPERKIT_VERSION_TAG =" )
 OLD_VERSION="${OLD_VERSION_POD_ARG##* }"
 
-echo "The currently released version is $OLD_VERSION. What should the version of the next release be?"
+echo "Currently released version is $OLD_VERSION, What should the version of the next release be?"
 read -r VERSION
-
-# This could be one expression with GNU sed, but I guess we want to support the BSD crap, too.
-SNAPSHOT_MINOR_VERSION=$(echo "$VERSION" | sed -Ee 's/([0-9]+)\.([0-9]+)\.([0-9]+)/\3 + 1/' | bc)
-SNAPSHOT_VERSION="$(echo "$VERSION" | sed -Ee 's/([0-9]+)\.([0-9]+)\.([0-9]+)/\1.\2./')""$SNAPSHOT_MINOR_VERSION""-SNAPSHOT"
 
 echo "Updating version $VERSION in podspecs, podfiles and in getting started docs..."
 
@@ -71,12 +62,12 @@ fi
 
 if [ ! -d "$SPECS_DIR/FlipperKit/" ]   # for file "if [-f /home/rama/file]"
 then
-  mkdir "$SPECS_DIR/FlipperKit/"
+    mkdir "$SPECS_DIR/FlipperKit/"
 fi
 
 if [ ! -d "$SPECS_DIR/Flipper/" ]   # for file "if [-f /home/rama/file]"
 then
-  mkdir "$SPECS_DIR/Flipper/"
+    mkdir "$SPECS_DIR/Flipper/"
 fi
 
 mkdir "$SPECS_DIR/FlipperKit/$VERSION"  # New Specs dir for FlipperKit podspec
@@ -96,15 +87,7 @@ jq '.version = $newVal' --arg newVal "$VERSION" "$SONAR_DIR"/package.json > tmp.
 
 echo "Committing the files..."
 hg addremove
+hg commit -m"Flipper Release: v$VERSION"
 
-hg commit -m "Flipper Release: v$VERSION"
-
-RELEASE_REV="$(hg log -r . --template "{node}\\n")"
-
-echo "Release commit made as $RELEASE_REV, creating new snapshot version $SNAPSHOT_VERSION..."
-"$SONAR_DIR"/scripts/bump.sh --snapshot "$SNAPSHOT_VERSION"
-
-hg commit -m "Flipper Bump: v$SNAPSHOT_VERSION"
-
-echo "Sumitting diffs for review..."
-jf submit -n -r.^::.
+echo "Preparing diff for your review..."
+arc diff --prepare

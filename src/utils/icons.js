@@ -36,14 +36,6 @@ export const precachedIcons: Array<string> = [
     size: 12,
   },
   {
-    name: 'box',
-    size: 12,
-  },
-  {
-    name: 'desktop',
-    size: 12,
-  },
-  {
     name: 'bug',
     size: 12,
   },
@@ -104,9 +96,7 @@ export function getIconUrl(
     }
   }
 
-  let requestedScale: number =
-    typeof window !== 'undefined' ? window.devicePixelRatio : 1;
-
+  let requestedScale: number = window.devicePixelRatio;
   if (!SCALE.includes(requestedScale)) {
     // find the next largest size
     const possibleScale: ?number = SCALE.find(scale => {

@@ -20,6 +20,8 @@ import {colors} from '../colors.js';
 import Text from '../Text.js';
 import styled from '../../styled/index.js';
 import {clipboard} from 'electron';
+import AutoSizer from 'react-virtualized-auto-sizer';
+import {FixedSizeList as List} from 'react-window';
 
 const ROW_HEIGHT = 23;
 
@@ -122,7 +124,7 @@ class PartialHighlight extends PureComponent<{
   content: string,
 }> {
   static HighlightedText = styled('span')(({selected}) => ({
-    backgroundColor: colors.lemon,
+    backgroundColor: '#ffff33',
     color: selected ? `${colors.grapeDark3} !important` : 'auto',
   }));
 
@@ -168,7 +170,8 @@ class ElementsRowAttribute extends PureComponent<{
     const {name, value, matchingSearchQuery, selected} = this.props;
     return (
       <ElementsRowAttributeContainer code={true}>
-        <ElementsRowAttributeKey>{name}</ElementsRowAttributeKey>=
+        <ElementsRowAttributeKey>{name}</ElementsRowAttributeKey>
+        =
         <ElementsRowAttributeValue>
           <PartialHighlight
             content={value}
@@ -203,7 +206,7 @@ type ElementsRowProps = {
   onElementExpanded: (key: ElementID, deep: boolean) => void,
   childrenCount: number,
   onElementHovered: ?(key: ?ElementID) => void,
-  style?: Object,
+  style: ?Object,
   contextMenuExtensions: Array<ContextMenuExtension>,
 };
 
@@ -552,7 +555,7 @@ export class Elements extends PureComponent<ElementsProps, ElementsState> {
     }
   };
 
-  buildRow = (row: FlatElement, index: number) => {
+  buildRow = ({index, style}: {index: number, style: Object}) => {
     const {
       elements,
       onElementExpanded,
@@ -564,6 +567,7 @@ export class Elements extends PureComponent<ElementsProps, ElementsState> {
       contextMenuExtensions,
     } = this.props;
     const {flatElements} = this.state;
+    const row = flatElements[index];
 
     let childrenCount = 0;
     for (let i = index + 1; i < flatElements.length; i++) {
@@ -599,16 +603,29 @@ export class Elements extends PureComponent<ElementsProps, ElementsState> {
         element={row.element}
         elements={elements}
         childrenCount={childrenCount}
+        style={style}
         contextMenuExtensions={contextMenuExtensions || []}
       />
     );
   };
 
   render() {
+    const items = this.state.flatElements;
+
     return (
       <ElementsBox>
         <ElementsContainer tabIndex="0" onKeyDown={this.onKeyDown}>
-          {this.state.flatElements.map(this.buildRow)}
+          <AutoSizer>
+            {({width, height}) => (
+              <List
+                itemCount={items.length}
+                itemSize={ROW_HEIGHT}
+                width={width}
+                height={height}>
+                {e => this.buildRow(e)}
+              </List>
+            )}
+          </AutoSizer>
         </ElementsContainer>
       </ElementsBox>
     );

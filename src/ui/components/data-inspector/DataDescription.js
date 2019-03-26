@@ -4,12 +4,12 @@
  * LICENSE file in the root directory of this source tree.
  * @format
  */
-import Link from '../Link';
+
 import type {DataInspectorSetValue} from './DataInspector.js';
 import {PureComponent} from 'react';
 import styled from '../../styled/index.js';
 import {SketchPicker} from 'react-color';
-import {Component, Fragment} from 'react';
+import {Component} from 'react';
 import Popover from '../Popover.js';
 import {colors} from '../colors.js';
 import Input from '../Input.js';
@@ -294,7 +294,7 @@ class ColorEditor extends Component<{
   render() {
     const colorInfo = parseColor(this.props.value);
     if (!colorInfo) {
-      return <Fragment />;
+      return;
     }
 
     return (
@@ -462,11 +462,7 @@ class DataDescriptionContainer extends Component<{
 
       case 'text':
       case 'string':
-        if (val.startsWith('http://') || val.startsWith('https://')) {
-          return <Link href={val}>{val}</Link>;
-        } else {
-          return <StringValue>"{String(val || '')}"</StringValue>;
-        }
+        return <StringValue>"{String(val || '')}"</StringValue>;
 
       case 'enum':
         return <StringValue>{String(val)}</StringValue>;

@@ -18,13 +18,8 @@ export const ErrorBlockContainer = styled(CodeBlock)({
   padding: 10,
 });
 
-/**
- * Displaying error messages in a red box.
- */
 export default class ErrorBlock extends React.Component<{
-  /** Error message to display. Error object's `stack` or `message` property is used. */
   error: Error | string | void,
-  /** Additional className added to the container. */
   className?: string,
 }> {
   render() {

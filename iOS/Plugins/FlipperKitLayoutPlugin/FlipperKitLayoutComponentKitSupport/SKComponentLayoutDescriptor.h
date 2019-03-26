@@ -7,12 +7,8 @@
  */
 #import <FlipperKitLayoutPlugin/SKNodeDescriptor.h>
 
-#import "SKSubDescriptor.h"
-
 @class SKComponentLayoutWrapper;
 
 @interface SKComponentLayoutDescriptor: SKNodeDescriptor<SKComponentLayoutWrapper *>
-
-- (void)addSubDescriptors:(NSArray<SKSubDescriptor *>*)subDescriptors;
 
 @end

@@ -1,20 +1,14 @@
 {
   "scripts": {
     "examples": "docusaurus-examples",
-    "start": "yarn generate-uidocs && docusaurus-start",
-    "build": "yarn generate-uidocs && docusaurus-build",
+    "start": "docusaurus-start",
+    "build": "docusaurus-build",
     "publish-gh-pages": "docusaurus-publish",
     "write-translations": "docusaurus-write-translations",
     "version": "docusaurus-version",
-    "rename-version": "docusaurus-rename-version",
-    "generate-uidocs": "node ./generate-uidocs.js"
+    "rename-version": "docusaurus-rename-version"
   },
   "devDependencies": {
-    "@babel/parser": "^7.1.3",
-    "docblock-parser": "^1.0.0",
-    "docusaurus": "^1.0.9",
-    "glob": "^7.1.3",
-    "react-docgen": "^3.0.0-rc.1"
-  },
-  "dependencies": {}
+    "docusaurus": "^1.0.9"
+  }
 }

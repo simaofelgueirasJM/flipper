@@ -10,15 +10,15 @@ import {Provider} from 'react-redux';
 import renderer from 'react-test-renderer';
 import reducers from '../reducers/index.js';
 import configureStore from 'redux-mock-store';
-import {init as initLogger} from '../fb-stubs/Logger';
+import Logger from '../fb-stubs/Logger.js';
 import BugReporter from '../fb-stubs/BugReporter.js';
 
 // create redux store with initial state
 const mockStore = configureStore([])(reducers(undefined, {type: 'INIT'}));
 
 test('Empty app state matches snapshot', () => {
-  const logger = initLogger(mockStore);
-  const bugReporter = new BugReporter(logger, mockStore);
+  const logger = new Logger();
+  const bugReporter = new BugReporter(logger);
 
   const component = renderer.create(
     <Provider store={mockStore}>
@@ -26,9 +26,11 @@ test('Empty app state matches snapshot', () => {
         logger={logger}
         bugReporter={bugReporter}
         leftSidebarVisible={false}
+        bugDialogVisible={false}
+        pluginManagerVisible={false}
         selectedDevice={null}
+        toggleBugDialogVisible={() => {}}
         error={null}
-        activeSheet={null}
       />
     </Provider>,
   );

@@ -1,8 +1,9 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
+/*
+ *  Copyright (c) 2018-present, Facebook, Inc.
  *
- * This source code is licensed under the MIT license found in the LICENSE
- * file in the root directory of this source tree.
+ *  This source code is licensed under the MIT license found in the LICENSE
+ *  file in the root directory of this source tree.
+ *
  */
 package com.facebook.flipper.android;
 
@@ -11,8 +12,8 @@ import android.content.pm.PackageManager;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
-import androidx.core.content.ContextCompat;
 import com.facebook.flipper.core.FlipperClient;
 
 public final class AndroidFlipperClient {
@@ -35,8 +36,6 @@ public final class AndroidFlipperClient {
       FlipperClientImpl.init(
           sFlipperThread.getEventBase(),
           sConnectionThread.getEventBase(),
-          FlipperProps.getInsecurePort(),
-          FlipperProps.getSecurePort(),
           getServerHost(app),
           "Android",
           getFriendlyDeviceName(),
@@ -90,10 +89,7 @@ public final class AndroidFlipperClient {
   }
 
   static String getServerHost(Context context) {
-    if (isRunningOnStockEmulator() && Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-      // adb reverse was added in lollipop, so before this
-      // hard code host ip address.
-      // This means it will only work on emulators, not physical devices.
+    if (isRunningOnStockEmulator()) {
       return "10.0.2.2";
     } else if (isRunningOnGenymotion()) {
       // This is hand-wavy but works on but ipv4 and ipv6 genymotion
@@ -102,8 +98,7 @@ public final class AndroidFlipperClient {
       final int ip = info.getIpAddress();
       return String.format("%d.%d.%d.2", (ip & 0xff), (ip >> 8 & 0xff), (ip >> 16 & 0xff));
     } else {
-      // Running on physical device or modern stock emulator.
-      // Flipper desktop will run `adb reverse` to forward the ports.
+      // Running on physical device. Flipper desktop will run `adb reverse tcp:8088 tcp:8088`
       return "localhost";
     }
   }

@@ -4,25 +4,26 @@
  * LICENSE file in the root directory of this source tree.
  * @format
  */
-import type {FlipperPlugin, FlipperDevicePlugin} from './plugin.js';
-import type {Logger} from './fb-interfaces/Logger';
-import BaseDevice from './devices/BaseDevice.js';
+import type {FlipperPlugin, FlipperBasePlugin} from './plugin.js';
+import type LogManager from './fb-stubs/Logger';
+import type BaseDevice from './devices/BaseDevice.js';
 import type {Props as PluginProps} from './plugin';
-import {pluginKey as getPluginKey} from './reducers/pluginStates';
+
+import {FlipperDevicePlugin} from './plugin.js';
 import Client from './Client.js';
 import {
   ErrorBoundary,
-  PureComponent,
+  Component,
   FlexColumn,
   FlexRow,
   colors,
   styled,
-  ArchivedDevice,
 } from 'flipper';
 import React from 'react';
 import {connect} from 'react-redux';
 import {setPluginState} from './reducers/pluginStates.js';
 import {selectPlugin} from './reducers/connections';
+import {devicePlugins, clientPlugins} from './plugins/index.js';
 import NotificationsHub from './NotificationsHub';
 import {activateMenuItems} from './MenuBar.js';
 
@@ -39,46 +40,74 @@ const SidebarContainer = styled(FlexRow)({
   overflow: 'scroll',
 });
 
-/*
-pluginState: pluginStates[pluginKey],
-activePlugin,
-target,
-deepLinkPayload,
-pluginKey,
-*/
-type OwnProps = {|
-  logger: Logger,
-|};
-
-type Props = {|
-  ...OwnProps,
-  pluginState: Object,
-  activePlugin: ?Class<FlipperPlugin<> | FlipperDevicePlugin<>>,
-  target: Client | BaseDevice | null,
-  pluginKey: string,
+type Props = {
+  logger: LogManager,
+  selectedDevice: BaseDevice,
+  selectedPlugin: ?string,
+  selectedApp: ?string,
+  pluginStates: {
+    [pluginKey: string]: Object,
+  },
+  clients: Array<Client>,
+  setPluginState: (payload: {
+    pluginKey: string,
+    state: Object,
+  }) => void,
   deepLinkPayload: ?string,
-
   selectPlugin: (payload: {|
     selectedPlugin: ?string,
     selectedApp?: ?string,
     deepLinkPayload: ?string,
   |}) => mixed,
-  setPluginState: (payload: {
-    pluginKey: string,
-    state: Object,
-  }) => void,
-  isArchivedDevice: boolean,
-|};
+};
 
-class PluginContainer extends PureComponent<Props> {
-  plugin: ?FlipperPlugin<> | FlipperDevicePlugin<>;
+type State = {
+  activePlugin: ?Class<FlipperBasePlugin<>>,
+  target: Client | BaseDevice | null,
+  pluginKey: string,
+};
 
-  refChanged = (ref: ?FlipperPlugin<> | FlipperDevicePlugin<>) => {
+class PluginContainer extends Component<Props, State> {
+  static getDerivedStateFromProps(props: Props): State {
+    let activePlugin = [NotificationsHub, ...devicePlugins].find(
+      (p: Class<FlipperDevicePlugin<>>) => p.id === props.selectedPlugin,
+    );
+    let target = props.selectedDevice;
+    let pluginKey = 'unknown';
+    if (activePlugin) {
+      pluginKey = `${props.selectedDevice.serial}#${activePlugin.id}`;
+    } else {
+      target = props.clients.find(
+        (client: Client) => client.id === props.selectedApp,
+      );
+      activePlugin = clientPlugins.find(
+        (p: Class<FlipperPlugin<>>) => p.id === props.selectedPlugin,
+      );
+      if (!activePlugin || !target) {
+        throw new Error(
+          `Plugin "${props.selectedPlugin || ''}" could not be found.`,
+        );
+      }
+      pluginKey = `${target.id}#${activePlugin.id}`;
+    }
+
+    return {
+      activePlugin,
+      target,
+      pluginKey,
+    };
+  }
+
+  state: State = this.constructor.getDerivedStateFromProps(this.props);
+  plugin: ?FlipperBasePlugin<>;
+
+  refChanged = (ref: ?FlipperBasePlugin<>) => {
     if (this.plugin) {
       this.plugin._teardown();
       this.plugin = null;
     }
-    if (ref && this.props.target) {
+    const {target} = this.state;
+    if (ref && target) {
       activateMenuItems(ref);
       ref._init();
       this.props.logger.trackTimeSince(`activePlugin-${ref.constructor.id}`);
@@ -87,31 +116,27 @@ class PluginContainer extends PureComponent<Props> {
   };
 
   render() {
-    const {
-      pluginState,
-      setPluginState,
-      activePlugin,
-      pluginKey,
-      target,
-      isArchivedDevice,
-    } = this.props;
+    const {pluginStates, setPluginState} = this.props;
+    const {activePlugin, pluginKey, target} = this.state;
+
     if (!activePlugin || !target) {
       return null;
     }
+
     const props: PluginProps<Object> = {
       key: pluginKey,
       logger: this.props.logger,
       persistedState: activePlugin.defaultPersistedState
         ? {
             ...activePlugin.defaultPersistedState,
-            ...pluginState,
+            ...pluginStates[pluginKey],
           }
-        : pluginState,
+        : pluginStates[pluginKey],
       setPersistedState: state => setPluginState({pluginKey, state}),
       target,
       deepLinkPayload: this.props.deepLinkPayload,
       selectPlugin: (pluginID: string, deepLinkPayload: ?string) => {
-        const {target} = this.props;
+        const {target} = this.state;
         // check if plugin will be available
         if (
           target instanceof Client &&
@@ -119,22 +144,20 @@ class PluginContainer extends PureComponent<Props> {
         ) {
           this.props.selectPlugin({selectedPlugin: pluginID, deepLinkPayload});
           return true;
-        } else if (target instanceof BaseDevice) {
-          this.props.selectPlugin({selectedPlugin: pluginID, deepLinkPayload});
-          return true;
         } else {
           return false;
         }
       },
       ref: this.refChanged,
-      isArchivedDevice,
     };
+
     return (
       <React.Fragment>
         <Container key="plugin">
           <ErrorBoundary
-            heading={`Plugin "${activePlugin.title ||
-              'Unknown'}" encountered an error during render`}
+            heading={`Plugin "${
+              activePlugin.title
+            }" encountered an error during render`}
             logger={this.props.logger}>
             {React.createElement(activePlugin, props)}
           </ErrorBoundary>
@@ -145,7 +168,7 @@ class PluginContainer extends PureComponent<Props> {
   }
 }
 
-export default connect<Props, OwnProps, _, _, _, _>(
+export default connect(
   ({
     application: {rightSidebarVisible, rightSidebarAvailable},
     connections: {
@@ -156,44 +179,14 @@ export default connect<Props, OwnProps, _, _, _, _>(
       deepLinkPayload,
     },
     pluginStates,
-    plugins: {devicePlugins, clientPlugins},
-  }) => {
-    let pluginKey = 'unknown';
-    let target = null;
-    let activePlugin: ?Class<FlipperPlugin<> | FlipperDevicePlugin<>> = null;
-
-    if (selectedPlugin) {
-      if (selectedPlugin === NotificationsHub.id) {
-        activePlugin = NotificationsHub;
-      } else if (selectedPlugin) {
-        activePlugin = devicePlugins.get(selectedPlugin);
-      }
-      target = selectedDevice;
-      if (activePlugin) {
-        pluginKey = getPluginKey(selectedDevice.serial, activePlugin.id);
-      } else {
-        target = clients.find((client: Client) => client.id === selectedApp);
-        activePlugin = clientPlugins.get(selectedPlugin);
-        if (!activePlugin || !target) {
-          throw new Error(
-            `Plugin "${selectedPlugin || ''}" could not be found.`,
-          );
-        }
-        pluginKey = getPluginKey(target.id, activePlugin.id);
-      }
-    }
-    const isArchivedDevice = !selectedDevice
-      ? false
-      : selectedDevice instanceof ArchivedDevice;
-    return {
-      pluginState: pluginStates[pluginKey],
-      activePlugin,
-      target,
-      deepLinkPayload,
-      pluginKey,
-      isArchivedDevice,
-    };
-  },
+  }) => ({
+    selectedPlugin,
+    selectedDevice,
+    pluginStates,
+    selectedApp,
+    clients,
+    deepLinkPayload,
+  }),
   {
     setPluginState,
     selectPlugin,

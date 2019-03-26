@@ -20,8 +20,6 @@ const borderColor = props => {
     return colors.macOSTitleBarButtonBorderBlur;
   } else if (props.type === 'danger') {
     return colors.red;
-  } else if (props.type === 'primary') {
-    return '#237FF1';
   } else if (props.depressed) {
     return colors.macOSTitleBarButtonBorderBottom;
   } else {
@@ -33,8 +31,6 @@ const borderBottomColor = props => {
     return colors.macOSTitleBarButtonBorderBlur;
   } else if (props.type === 'danger') {
     return colors.red;
-  } else if (props.type === 'primary') {
-    return '#237FF1';
   } else {
     return colors.macOSTitleBarButtonBorderBottom;
   }
@@ -48,8 +44,6 @@ const backgroundImage = props => {
       } 1px, ${colors.macOSTitleBarButtonBorderBlur} 0%, ${
         colors.macOSTitleBarButtonBackgroundActive
       } 100%)`;
-    } else if (props.type === 'primary') {
-      return `linear-gradient(to bottom, #67a6f7 0%, #0072FA 100%)`;
     } else {
       return `linear-gradient(to bottom, transparent 0%,${
         colors.macOSTitleBarButtonBackground
@@ -63,8 +57,6 @@ const backgroundImage = props => {
 const color = props => {
   if (props.type === 'danger' && props.windowIsFocused) {
     return colors.red;
-  } else if (props.type === 'primary' && props.windowIsFocused) {
-    return colors.white;
   } else if (props.disabled) {
     return colors.macOSTitleBarIconBlur;
   } else {
@@ -93,10 +85,11 @@ const StyledButton = styled('div')(props => ({
   borderWidth: 1,
   borderColor: borderColor(props),
   borderBottomColor: borderBottomColor(props),
+  fontSize: props.compact === true ? 11 : '1em',
   color: color(props),
   borderRadius: 4,
   position: 'relative',
-  padding: props.padded ? '0 15px' : '0 6px',
+  padding: '0 6px',
   height: props.compact === true ? 24 : 28,
   margin: 0,
   marginLeft: props.inButtonGroup === true ? 0 : 10,
@@ -193,9 +186,6 @@ type Props = {
    * Name of the icon dispalyed next to the text
    */
   icon?: string,
-  /**
-   * Size of the icon in pixels.
-   */
   iconSize?: number,
   /**
    * For toggle buttons, if the button is selected
@@ -213,14 +203,7 @@ type Props = {
    * Whether the button should render depressed into its socket
    */
   depressed?: boolean,
-  /**
-   * Style of the icon. `filled` is the default
-   */
   iconVariant?: 'filled' | 'outline',
-  /**
-   * Whether the button should have additional padding left and right.
-   */
-  padded?: boolean,
 };
 
 type State = {
@@ -228,7 +211,41 @@ type State = {
 };
 
 /**
- * A simple button, used in many parts of the application.
+ * Simple button.
+ *
+ * **Usage**
+ *
+ * ```jsx
+ * import {Button} from 'flipper';
+ * <Button onClick={handler}>Click me</Button>
+ * ```
+ *
+ * @example Default button
+ *   <Button>Click me</Button>
+ * @example Primary button
+ *   <Button type="primary">Click me</Button>
+ * @example Success button
+ *   <Button type="success">Click me</Button>
+ * @example Warning button
+ *   <Button type="warning">Click me</Button>
+ * @example Danger button
+ *   <Button type="danger">Click me</Button>
+ * @example Default solid button
+ *   <Button solid={true}>Click me</Button>
+ * @example Primary solid button
+ *   <Button type="primary" solid={true}>Click me</Button>
+ * @example Success solid button
+ *   <Button type="success" solid={true}>Click me</Button>
+ * @example Warning solid button
+ *   <Button type="warning" solid={true}>Click me</Button>
+ * @example Danger solid button
+ *   <Button type="danger" solid={true}>Click me</Button>
+ * @example Compact button
+ *   <Button compact={true}>Click me</Button>
+ * @example Large button
+ *   <Button large={true}>Click me</Button>
+ * @example Disabled button
+ *   <Button disabled={true}>Click me</Button>
  */
 class Button extends React.Component<
   Props & {windowIsFocused: boolean},

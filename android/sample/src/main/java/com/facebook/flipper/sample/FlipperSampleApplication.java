@@ -1,20 +1,18 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
+/*
+ *  Copyright (c) 2004-present, Facebook, Inc.
  *
- * <p>This source code is licensed under the MIT license found in the LICENSE file in the root
- * directory of this source tree.
+ *  This source code is licensed under the MIT license found in the LICENSE
+ *  file in the root directory of this source tree.
+ *
  */
 package com.facebook.flipper.sample;
 
 import android.app.Application;
 import android.content.Context;
-import androidx.annotation.Nullable;
-import com.facebook.drawee.backends.pipeline.Fresco;
+import android.support.annotation.Nullable;
 import com.facebook.flipper.android.AndroidFlipperClient;
 import com.facebook.flipper.core.FlipperClient;
-import com.facebook.flipper.plugins.crashreporter.CrashReporterPlugin;
 import com.facebook.flipper.plugins.example.ExampleFlipperPlugin;
-import com.facebook.flipper.plugins.fresco.FrescoFlipperPlugin;
 import com.facebook.flipper.plugins.inspector.DescriptorMapping;
 import com.facebook.flipper.plugins.inspector.InspectorFlipperPlugin;
 import com.facebook.flipper.plugins.leakcanary.LeakCanaryFlipperPlugin;
@@ -37,7 +35,6 @@ public class FlipperSampleApplication extends Application {
   public void onCreate() {
     super.onCreate();
     SoLoader.init(this, false);
-    Fresco.initialize(this);
 
     final FlipperClient client = AndroidFlipperClient.getInstance(this);
     final DescriptorMapping descriptorMapping = DescriptorMapping.withDefaults();
@@ -66,9 +63,7 @@ public class FlipperSampleApplication extends Application {
                 new SharedPreferencesDescriptor("sample", Context.MODE_PRIVATE),
                 new SharedPreferencesDescriptor("other_sample", Context.MODE_PRIVATE))));
     client.addPlugin(new LeakCanaryFlipperPlugin());
-    client.addPlugin(new FrescoFlipperPlugin());
     client.addPlugin(new ExampleFlipperPlugin());
-    client.addPlugin(CrashReporterPlugin.getInstance());
     client.start();
 
     getSharedPreferences("sample", Context.MODE_PRIVATE).edit().putString("Hello", "world").apply();

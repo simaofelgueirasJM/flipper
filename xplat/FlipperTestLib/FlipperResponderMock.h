@@ -1,9 +1,11 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
+/*
+ *  Copyright (c) 2018-present, Facebook, Inc.
  *
- * This source code is licensed under the MIT license found in the LICENSE
- * file in the root directory of this source tree.
+ *  This source code is licensed under the MIT license found in the LICENSE
+ *  file in the root directory of this source tree.
+ *
  */
+
 #pragma once
 
 #include <Flipper/FlipperResponder.h>
@@ -20,13 +22,13 @@ class FlipperResponderMock : public FlipperResponder {
       std::vector<folly::dynamic>* errors = nullptr)
       : successes_(successes), errors_(errors) {}
 
-  void success(const folly::dynamic& response) override {
+  void success(const folly::dynamic& response) const override {
     if (successes_) {
       successes_->push_back(response);
     }
   }
 
-  void error(const folly::dynamic& response) override {
+  void error(const folly::dynamic& response) const override {
     if (errors_) {
       errors_->push_back(response);
     }

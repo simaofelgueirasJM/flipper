@@ -34,21 +34,7 @@ export type DeviceShell = {
 
 export type DeviceLogListener = (entry: DeviceLogEntry) => void;
 
-export type DeviceType =
-  | 'emulator'
-  | 'physical'
-  | 'archivedEmulator'
-  | 'archivedPhysical';
-
-export type DeviceExport = {|
-  os: string,
-  title: string,
-  deviceType: DeviceType,
-  serial: string,
-  logs: Array<DeviceLogEntry>,
-|};
-
-export type OS = 'iOS' | 'Android' | 'Windows';
+export type DeviceType = 'emulator' | 'physical';
 
 export default class BaseDevice {
   constructor(serial: string, deviceType: DeviceType, title: string) {
@@ -58,7 +44,7 @@ export default class BaseDevice {
   }
 
   // operating system of this device
-  os: OS;
+  os: string;
 
   // human readable name for this device
   title: string;
@@ -75,64 +61,39 @@ export default class BaseDevice {
   logListeners: Map<Symbol, DeviceLogListener> = new Map();
   logEntries: Array<DeviceLogEntry> = [];
 
-  supportsOS(os: OS) {
+  supportsOS(os: string) {
     return os.toLowerCase() === this.os.toLowerCase();
   }
 
-  toJSON(): DeviceExport {
-    return {
-      os: this.os,
-      title: this.title,
-      deviceType: this.deviceType,
-      serial: this.serial,
-      logs: this.getLogs(),
-    };
+  toJSON() {
+    return `<${this.constructor.name}#${this.title}>`;
   }
 
   teardown() {}
 
   supportedColumns(): Array<string> {
-    return ['date', 'pid', 'tid', 'tag', 'message', 'type', 'time'];
+    throw new Error('unimplemented');
   }
 
   addLogListener(callback: DeviceLogListener): Symbol {
     const id = Symbol();
     this.logListeners.set(id, callback);
+    this.logEntries.map(callback);
     return id;
   }
 
-  _notifyLogListeners(entry: DeviceLogEntry) {
-    if (this.logListeners.size > 0) {
-      this.logListeners.forEach(listener => {
-        // prevent breaking other listeners, if one listener doesn't work.
-        try {
-          listener(entry);
-        } catch (e) {
-          console.error(`Log listener exception:`, e);
-        }
-      });
-    }
-  }
-
-  addLogEntry(entry: DeviceLogEntry) {
+  notifyLogListeners(entry: DeviceLogEntry) {
     this.logEntries.push(entry);
-    this._notifyLogListeners(entry);
-  }
-
-  getLogs() {
-    return this.logEntries;
-  }
-
-  clearLogs(): Promise<void> {
-    // Only for device types that allow clearing.
-    return Promise.resolve();
+    if (this.logListeners.size > 0) {
+      this.logListeners.forEach(listener => listener(entry));
+    }
   }
 
   removeLogListener(id: Symbol) {
     this.logListeners.delete(id);
   }
 
-  spawnShell(): ?DeviceShell {
+  spawnShell(): DeviceShell {
     throw new Error('unimplemented');
   }
 }

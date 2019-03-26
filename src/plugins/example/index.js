@@ -29,6 +29,10 @@ const Container = styled(FlexColumn)({
 });
 
 export default class extends FlipperPlugin<*, State, PersistedState> {
+  static title = 'Example';
+  static id = 'Example';
+  static icon = 'apps';
+
   static defaultPersistedState = {
     currentNotificationIds: [],
     receivedMessage: null,

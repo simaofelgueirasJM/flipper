@@ -8,7 +8,7 @@
 
 package com.facebook.flipper.plugins.inspector;
 
-import androidx.annotation.Nullable;
+import android.support.annotation.Nullable;
 import com.facebook.flipper.core.ErrorReportingRunnable;
 import com.facebook.flipper.core.FlipperArray;
 import com.facebook.flipper.core.FlipperConnection;
@@ -49,7 +49,7 @@ public abstract class NodeDescriptor<T> {
    * and/or children have changed. This will trigger Flipper to re-query this node getting any new
    * data.
    */
-  public void invalidate(final T node) {
+  protected final void invalidate(final T node) {
     if (mConnection != null) {
       new ErrorReportingRunnable(mConnection) {
         @Override

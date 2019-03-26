@@ -1,8 +1,9 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
+/*
+ *  Copyright (c) 2018-present, Facebook, Inc.
  *
- * <p>This source code is licensed under the MIT license found in the LICENSE file in the root
- * directory of this source tree.
+ *  This source code is licensed under the MIT license found in the LICENSE
+ *  file in the root directory of this source tree.
+ *
  */
 package com.facebook.flipper.android;
 
@@ -14,8 +15,6 @@ import com.facebook.flipper.core.StateSummary;
 import com.facebook.jni.HybridData;
 import com.facebook.proguard.annotations.DoNotStrip;
 import com.facebook.soloader.SoLoader;
-import java.util.HashMap;
-import java.util.Map;
 
 @DoNotStrip
 class FlipperClientImpl implements FlipperClient {
@@ -26,7 +25,6 @@ class FlipperClientImpl implements FlipperClient {
   }
 
   private final HybridData mHybridData;
-  private final Map<Class<?>, String> mClassIdentifierMap = new HashMap(8);
 
   private FlipperClientImpl(HybridData hd) {
     mHybridData = hd;
@@ -35,8 +33,6 @@ class FlipperClientImpl implements FlipperClient {
   public static native void init(
       EventBase callbackWorker,
       EventBase connectionWorker,
-      int insecurePort,
-      int securePort,
       String host,
       String os,
       String device,
@@ -48,34 +44,13 @@ class FlipperClientImpl implements FlipperClient {
   public static native FlipperClientImpl getInstance();
 
   @Override
-  public void addPlugin(FlipperPlugin plugin) {
-    mClassIdentifierMap.put(plugin.getClass(), plugin.getId());
-    addPluginNative(plugin);
-  }
+  public native void addPlugin(FlipperPlugin plugin);
 
-  public native void addPluginNative(FlipperPlugin plugin);
-
-  /**
-   * @deprecated Prefer using {@link #getPluginByClass(Class)} over the stringly-typed interface.
-   */
   @Override
-  @Deprecated
   public native <T extends FlipperPlugin> T getPlugin(String id);
 
   @Override
-  public <T extends FlipperPlugin> T getPluginByClass(Class<T> cls) {
-    final String id = mClassIdentifierMap.get(cls);
-    //noinspection deprecation
-    return getPlugin(id);
-  }
-
-  public native void removePluginNative(FlipperPlugin plugin);
-
-  @Override
-  public void removePlugin(FlipperPlugin plugin) {
-    mClassIdentifierMap.remove(plugin.getClass());
-    removePluginNative(plugin);
-  }
+  public native void removePlugin(FlipperPlugin plugin);
 
   @Override
   public native void start();

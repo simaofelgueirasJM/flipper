@@ -17,7 +17,7 @@ final FlipperClient client = AndroidFlipperClient.getInstance(context);
 // Client may be null if AndroidFlipperClient.createInstance() was never called
 // which is the case in production builds.
 if (client != null) {
-  final MyFlipperPlugin plugin = client.getPluginByClass(MyFlipperPlugin.class);
+  final MyFlipperPlugin plugin = client.getPlugin("MyFlipperPlugin");
   plugin.sendData(myData);
 }
 ```

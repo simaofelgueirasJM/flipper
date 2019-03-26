@@ -1,10 +1,5 @@
-/*
- *  Copyright (c) 2004-present, Facebook, Inc.
- *
- *  This source code is licensed under the MIT license found in the LICENSE
- *  file in the root directory of this source tree.
- *
- */
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 package com.facebook.flipper.plugins.litho;
 
 import android.view.View;
@@ -75,7 +70,8 @@ public final class GenerateLithoAccessibilityRenderExtensionCommand
     while (!lithoViewSearchStack.isEmpty()) {
       ViewGroup v = lithoViewSearchStack.pop();
       if (v instanceof LithoView) {
-        ((LithoView) v).rerenderForAccessibility(forceLithoAXRender);
+        // TODO: uncomment once Litho open source updates
+        //                ((LithoView) v).rerenderForAccessibility(forceLithoAXRender);
       } else {
         for (int i = 0; i < v.getChildCount(); i++) {
           View child = v.getChildAt(i);

@@ -55,23 +55,15 @@ export default class IOSDevice extends BaseDevice {
   }
 
   startLogListener(retries: number = 3) {
-    if (this.deviceType === 'physical') {
-      return;
-    }
     if (retries === 0) {
       console.error('Attaching iOS log listener continuously failed.');
       return;
     }
     if (!this.log) {
-      const deviceSetPath = process.env.DEVICE_SET_PATH
-        ? ['--set', process.env.DEVICE_SET_PATH]
-        : [];
-
       this.log = child_process.spawn(
         'xcrun',
         [
           'simctl',
-          ...deviceSetPath,
           'spawn',
           'booted',
           'log',
@@ -105,7 +97,7 @@ export default class IOSDevice extends BaseDevice {
         .pipe(JSONStream.parse('*'))
         .on('data', (data: RawLogEntry) => {
           const entry = IOSDevice.parseLogEntry(data);
-          this.addLogEntry(entry);
+          this.notifyLogListeners(entry);
         });
     } catch (e) {
       console.error('Could not parse iOS log stream.', e);

@@ -1,7 +1,7 @@
-folly_compiler_flags = '-DFLIPPER_OSS=1 -DFB_SONARKIT_ENABLED=1 -DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -DFOLLY_HAVE_LIBGFLAGS=0 -DFOLLY_HAVE_LIBJEMALLOC=0 -DFOLLY_HAVE_PREADV=0 -DFOLLY_HAVE_PWRITEV=0 -DFOLLY_HAVE_TFO=0 -DFOLLY_USE_SYMBOLIZER=0'
+folly_compiler_flags = '-DFB_SONARKIT_ENABLED=1 -DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -DFOLLY_HAVE_LIBGFLAGS=0 -DFOLLY_HAVE_LIBJEMALLOC=0 -DFOLLY_HAVE_PREADV=0 -DFOLLY_HAVE_PWRITEV=0 -DFOLLY_HAVE_TFO=0 -DFOLLY_USE_SYMBOLIZER=0'
 yoga_version = '~> 1.9'
-yogakit_version = '~>1.10'
-flipperkit_version = '0.18.0'
+yogakit_version = '~>1.8'
+flipperkit_version = '0.10.0'
 Pod::Spec.new do |spec|
   spec.name = 'FlipperKit'
   spec.version = flipperkit_version
@@ -16,10 +16,10 @@ Pod::Spec.new do |spec|
   spec.platforms = { :ios => "8.4" }
   spec.default_subspecs = "Core"
 
-  # This subspec is necessary since FBDefines.h is imported as <FBDefines/FBDefines.h>
+  # This subspec is necessary since FBMacros.h is imported as <FBDefines/FBMacros.h>
   # inside SKMacros.h, which is a public header file. Defining this directory as a
   # subspec with header_dir = 'FBDefines' allows this to work, even though it wouldn't
-  # generally (you would need to import <FlipperKit/t/FBDefines/FBDefines.h>)
+  # generally (you would need to import <FlipperKit/t/FBDefines/FBMacros.h>)
   spec.subspec 'FBDefines' do |ss|
     ss.header_dir = 'FBDefines'
     ss.compiler_flags = folly_compiler_flags
@@ -32,7 +32,7 @@ Pod::Spec.new do |spec|
     ss.compiler_flags = folly_compiler_flags
     ss.source_files = 'iOS/FlipperKit/CppBridge/**/*.{h,mm}'
     # We set these files as private headers since they only need to be accessed
-    # by other FlipperKit source files
+    # by other SonarKit source files
     ss.private_header_files = 'iOS/FlipperKit/CppBridge/**/*.h'
     ss.preserve_path = 'FlipperKit/CppBridge/**/*.h'
   end
@@ -42,30 +42,21 @@ Pod::Spec.new do |spec|
     ss.compiler_flags = folly_compiler_flags
     ss.source_files = 'iOS/FlipperKit/FBCxxUtils/**/*.{h,mm}'
     # We set these files as private headers since they only need to be accessed
-    # by other FlipperKit source files
+    # by other SonarKit source files
     ss.private_header_files = 'iOS/FlipperKit/FBCxxUtils/**/*.h'
   end
-
-  spec.subspec "FKPortForwarding" do |ss|
-    ss.header_dir = "FKPortForwarding"
-    ss.dependency 'CocoaAsyncSocket', '~> 7.6'
-    ss.dependency 'PeerTalk', '~>0.0.2'
-    ss.compiler_flags = folly_compiler_flags
-    ss.source_files = 'iOS/FlipperKit/FKPortForwarding/FKPortForwarding{Server,Common}.{h,m}'
-    ss.private_header_files = 'iOS/FlipperKit/FKPortForwarding/FKPortForwarding{Server,Common}.h'
-  end
-
 
   spec.subspec "Core" do |ss|
     ss.dependency 'FlipperKit/FBDefines'
     ss.dependency 'FlipperKit/FBCxxUtils'
     ss.dependency 'FlipperKit/CppBridge'
-    ss.dependency 'FlipperKit/FKPortForwarding'
-    ss.dependency 'Flipper-Folly', '~>1.2'
+    ss.dependency 'Folly', '~>1.1'
     ss.dependency 'Flipper', '~>'+flipperkit_version
+    ss.dependency 'CocoaAsyncSocket', '~> 7.6'
+    ss.dependency 'PeerTalk', '~>0.0.2'
     ss.dependency 'OpenSSL-Static', '1.0.2.c1'
     ss.compiler_flags = folly_compiler_flags
-    ss.source_files = 'iOS/FlipperKit/FBDefines/*.{h,cpp,m,mm}', 'iOS/FlipperKit/CppBridge/*.{h,mm}', 'iOS/FlipperKit/FBCxxUtils/*.{h,mm}', 'iOS/FlipperKit/*.{h,m,mm}'
+    ss.source_files = 'iOS/FlipperKit/FBDefines/*.{h,cpp,m,mm}', 'iOS/FlipperKit/CppBridge/*.{h,mm}', 'iOS/FlipperKit/FBCxxUtils/*.{h,mm}', 'iOS/FlipperKit/Utilities/**/*.{h,m}', 'iOS/FlipperKit/*.{h,m,mm}'
     ss.public_header_files = 'iOS/Plugins/FlipperKitNetworkPlugin/SKIOSNetworkPlugin/SKIOSNetworkAdapter.h',
                              'iOS/Plugins/FlipperKitNetworkPlugin/FlipperKitNetworkPlugin/SKBufferingPlugin.h',
                              'iOS/Plugins/FlipperKitNetworkPlugin/FlipperKitNetworkPlugin/SKNetworkReporter.h',
@@ -78,10 +69,7 @@ Pod::Spec.new do |spec|
                              'iOS/Plugins/FlipperKitLayoutPlugin/FlipperKitLayoutPlugin/SKInvalidation.h',
                              'iOS/Plugins/FlipperKitLayoutPlugin/FlipperKitLayoutPlugin/SKDescriptorMapper.h',
                              'iOS/Plugins/FlipperKitLayoutPlugin/FlipperKitLayoutComponentKitSupport/FlipperKitLayoutComponentKitSupport.h',
-                             'iOS/Plugins/FlipperKitLayoutPlugin/FlipperKitLayoutComponentKitSupport/SKSubDescriptor.h',
-                             'iOS/FBDefines/FBDefines.h',
-                             'iOS/Plugins/FlipperKitExamplePlugin/FlipperKitExamplePlugin/FlipperKitExamplePlugin.h',
-                             'iOS/Plugins/FlipperKitCrashReporterPlugin/FlipperKitCrashReporterPlugin/FlipperKitCrashReporterPlugin.h',
+                             'iOS/FBDefines/FBMacros.h',
                              'iOS/FlipperKit/**/{FlipperDiagnosticsViewController,FlipperStateUpdateListener,FlipperClient,FlipperPlugin,FlipperConnection,FlipperResponder,SKMacros}.h'
     header_search_paths = "\"$(PODS_ROOT)/FlipperKit/iOS/FlipperKit\" \"$(PODS_ROOT)\"/Headers/Private/FlipperKit/** \"$(PODS_ROOT)/boost-for-react-native\" \"$(PODS_ROOT)/DoubleConversion\" \"$(PODS_ROOT)/PeerTalkSonar\""
     ss.pod_target_xcconfig = { "USE_HEADERMAP" => "NO",
@@ -120,8 +108,7 @@ Pod::Spec.new do |spec|
     ss.dependency             'FlipperKit/FlipperKitLayoutPlugin'
     ss.compiler_flags       = folly_compiler_flags
     ss.dependency             'FlipperKit/FlipperKitLayoutPlugin'
-    ss.public_header_files = 'iOS/Plugins/FlipperKitLayoutPlugin/FlipperKitLayoutComponentKitSupport/FlipperKitLayoutComponentKitSupport.h',
-                             'iOS/Plugins/FlipperKitLayoutPlugin/FlipperKitLayoutComponentKitSupport/SKSubDescriptor.h'
+    ss.public_header_files = 'iOS/Plugins/FlipperKitLayoutPlugin/FlipperKitLayoutComponentKitSupport/FlipperKitLayoutComponentKitSupport.h'
     ss.source_files         = "iOS/Plugins/FlipperKitLayoutPlugin/FlipperKitLayoutComponentKitSupport/**/*.{h,cpp,m,mm}"
     ss.pod_target_xcconfig = { "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)\"/Headers/Private/FlipperKit/**" }
   end

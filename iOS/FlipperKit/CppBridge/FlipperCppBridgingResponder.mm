@@ -10,17 +10,17 @@
 #import <FBCxxUtils/FBCxxFollyDynamicConvert.h>
 
 @implementation FlipperCppBridgingResponder {
-  std::shared_ptr<facebook::flipper::FlipperResponder> responder_;
+  std::unique_ptr<facebook::flipper::FlipperResponder> responder_;
 }
 
-- (instancetype)initWithCppResponder:(std::shared_ptr<facebook::flipper::FlipperResponder>)responder
+- (instancetype)initWithCppResponder:(std::unique_ptr<facebook::flipper::FlipperResponder>)responder
 {
   if (!responder) {
     return nil;
   }
 
   if (self = [super init]) {
-    responder_ = responder;
+    responder_ = std::move(responder);
   }
 
   return self;

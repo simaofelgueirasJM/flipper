@@ -6,18 +6,15 @@
  */
 
 import Server from '../server.js';
-import {init as initLogger} from '../fb-stubs/Logger';
+import LogManager from '../fb-stubs/Logger';
 import reducers from '../reducers/index.js';
-import {createStore} from 'redux';
+import configureStore from 'redux-mock-store';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
-import androidDevice from '../dispatcher/androidDevice';
-import iosDevice from '../dispatcher/iOSDevice';
-import type Client from '../Client';
 
 let server;
-const store = createStore(reducers);
+const mockStore = configureStore([])(reducers(undefined, {type: 'INIT'}));
 
 beforeAll(() => {
   // create config directory, which is usually created by static/index.js
@@ -26,43 +23,30 @@ beforeAll(() => {
     fs.mkdirSync(flipperDir);
   }
 
-  const logger = initLogger(store);
-
-  androidDevice(store, logger);
-  iosDevice(store, logger);
-
-  server = new Server(logger, store);
+  server = new Server(new LogManager(), mockStore);
   return server.init();
 });
 
-test('Device can connect successfully', done => {
-  var testFinished = false;
-  var disconnectedTooEarly = false;
-  const registeredClients = [];
-  server.addListener('new-client', (client: Client) => {
-    // Check there is a connected device that has the same device_id as the new client
-    const deviceId = client.query.device_id;
-    expect(deviceId).toBeTruthy();
-    const devices = store.getState().connections.devices;
-    expect(devices.map(device => device.serial)).toContain(deviceId);
-
-    // Make sure it only connects once
-    registeredClients.push(client);
-    expect(registeredClients).toHaveLength(1);
-
-    // Make sure client stays connected for some time before passing test
-    setTimeout(() => {
-      testFinished = true;
-      expect(disconnectedTooEarly).toBe(false);
-      done();
-    }, 5000);
-  });
-  server.addListener('removed-client', (id: string) => {
-    if (!testFinished) {
-      disconnectedTooEarly = true;
-    }
-  });
-}, 20000);
+test(
+  'Device can connect successfully',
+  done => {
+    var testFinished = false;
+    server.addListener('new-client', (client: Client) => {
+      console.debug('new-client ' + new Date().toString());
+      setTimeout(() => {
+        testFinished = true;
+        done();
+      }, 5000);
+    });
+    server.addListener('removed-client', (id: string) => {
+      console.debug('removed-client ' + new Date().toString());
+      if (!testFinished) {
+        done.fail('client disconnected too early');
+      }
+    });
+  },
+  20000,
+);
 
 afterAll(() => {
   return server.close();

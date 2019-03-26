@@ -45,18 +45,14 @@ android {
         compileOnly deps.lithoAnnotations
         implementation project(':fbjni')
         implementation deps.soloader
+        implementation deps.guava
         implementation deps.jsr305
         implementation deps.supportAppCompat
         implementation deps.stetho
         implementation deps.okhttp3
         implementation deps.lithoCore
-        implementation deps.lithoSectionsDebug
-        implementation deps.lithoSectionsCore
         implementation deps.lithoWidget
         implementation deps.rhino
-        implementation deps.fresco
-        implementation deps.frescoFlipper
-        implementation deps.frescoStetho
         compileOnly deps.leakcanary
 
         testImplementation deps.mockito

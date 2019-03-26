@@ -16,8 +16,6 @@ import type {
   TableOnAddFilter,
 } from './types.js';
 
-import type {MenuTemplate} from '../ContextMenu.js';
-
 import React from 'react';
 import styled from '../../styled/index.js';
 import AutoSizer from 'react-virtualized-auto-sizer';
@@ -27,7 +25,7 @@ import TableHead from './TableHead.js';
 import TableRow from './TableRow.js';
 import ContextMenu from '../ContextMenu.js';
 import FlexColumn from '../FlexColumn.js';
-import createPaste from '../../../fb-stubs/createPaste.js';
+import createPaste from '../../../utils/createPaste.js';
 import debounceRender from 'react-debounce-render';
 import debounce from 'lodash.debounce';
 import {DEFAULT_ROW_HEIGHT} from './types';
@@ -108,14 +106,6 @@ export type ManagedTableProps = {|
    * Rows that are highlighted initially.
    */
   highlightedRows?: Set<string>,
-  /**
-   * Allows to create context menu items for rows
-   */
-  buildContextMenuItems?: () => MenuTemplate,
-  /**
-   * Callback when sorting changes
-   */
-  onSort?: (order: TableRowSortOrder) => void,
 |};
 
 type ManagedTableState = {|
@@ -160,19 +150,13 @@ class ManagedTable extends React.Component<
     shouldScrollToBottom: Boolean(this.props.stickyBottom),
   };
 
-  tableRef = React.createRef<List>();
-
+  tableRef: {
+    current: null | List,
+  } = React.createRef();
   scrollRef: {
     current: null | HTMLDivElement,
   } = React.createRef();
-
   dragStartIndex: ?number = null;
-
-  // We want to call scrollToHighlightedRows on componentDidMount. However, at
-  // this time, tableRef is still null, because AutoSizer needs one render to
-  // measure the size of the table. This is why we are using this flag to
-  // trigger actions on the first update instead.
-  firstUpdate = true;
 
   componentDidMount() {
     document.addEventListener('keydown', this.onKeyDown);
@@ -193,15 +177,26 @@ class ManagedTable extends React.Component<
       });
     }
 
+    //
     if (this.props.highlightedRows !== nextProps.highlightedRows) {
       this.setState({highlightedRows: nextProps.highlightedRows});
+      const {current} = this.tableRef;
+      const {highlightedRows} = nextProps;
+      if (current && highlightedRows && highlightedRows.size > 0) {
+        const index = nextProps.rows.findIndex(
+          ({key}) => key === Array.from(highlightedRows)[0],
+        );
+        current.scrollToItem(index);
+      }
     }
 
     // if columnOrder has changed
-    if (nextProps.columnOrder !== this.props.columnOrder) {
-      if (this.tableRef && this.tableRef.current) {
-        this.tableRef.current.resetAfterIndex(0);
-      }
+    if (
+      nextProps.columnOrder !== this.props.columnOrder &&
+      this.tableRef &&
+      this.tableRef.current
+    ) {
+      this.tableRef.current.resetAfterIndex(0);
       this.setState({
         columnOrder: nextProps.columnOrder,
       });
@@ -217,38 +212,15 @@ class ManagedTable extends React.Component<
     }
   }
 
-  componentDidUpdate(
-    prevProps: ManagedTableProps,
-    prevState: ManagedTableState,
-  ) {
+  componentDidUpdate(prevProps: ManagedTableProps) {
     if (
       this.props.rows.length !== prevProps.rows.length &&
       this.state.shouldScrollToBottom &&
       this.state.highlightedRows.size < 2
     ) {
       this.scrollToBottom();
-    } else if (
-      prevState.highlightedRows !== this.state.highlightedRows ||
-      this.firstUpdate
-    ) {
-      this.scrollToHighlightedRows();
     }
-    this.firstUpdate = false;
   }
-
-  scrollToHighlightedRows = () => {
-    const {current} = this.tableRef;
-    const {highlightedRows} = this.state;
-    if (current && highlightedRows && highlightedRows.size > 0) {
-      const highlightedRow = Array.from(highlightedRows)[0];
-      const index = this.props.rows.findIndex(
-        ({key}) => key === highlightedRow,
-      );
-      if (index >= 0) {
-        current.scrollToItem(index);
-      }
-    }
-  };
 
   onCopy = () => {
     clipboard.writeText(this.getSelectedText());
@@ -306,7 +278,6 @@ class ManagedTable extends React.Component<
 
   onSort = (sortOrder: TableRowSortOrder) => {
     this.setState({sortOrder});
-    this.props.onSort && this.props.onSort(sortOrder);
   };
 
   onColumnOrder = (columnOrder: TableColumnOrder) => {
@@ -351,7 +322,8 @@ class ManagedTable extends React.Component<
     document.addEventListener('mouseup', this.onStopDragSelecting);
 
     if (
-      ((e.metaKey && process.platform === 'darwin') || e.ctrlKey) &&
+      ((e.metaKey && process.platform === 'darwin') ||
+        (e.ctrlKey && process.platform !== 'darwin')) &&
       this.props.multiHighlight
     ) {
       highlightedRows.add(row.key);
@@ -525,33 +497,27 @@ class ManagedTable extends React.Component<
   };
 
   render() {
-    const {columns, rows, rowLineHeight, hideHeader} = this.props;
+    const {columns, rows, rowLineHeight} = this.props;
     const {columnOrder, columnSizes} = this.state;
 
     return (
       <Container>
-        {hideHeader !== true && (
-          <TableHead
-            columnOrder={columnOrder}
-            onColumnOrder={this.onColumnOrder}
-            columns={columns}
-            onColumnResize={this.onColumnResize}
-            sortOrder={this.state.sortOrder}
-            columnSizes={columnSizes}
-            onSort={this.onSort}
-          />
-        )}
+        <TableHead
+          columnOrder={columnOrder}
+          onColumnOrder={this.onColumnOrder}
+          columns={columns}
+          onColumnResize={this.onColumnResize}
+          sortOrder={this.state.sortOrder}
+          columnSizes={columnSizes}
+          onSort={this.onSort}
+        />
         <Container>
           {this.props.autoHeight ? (
             this.props.rows.map((_, index) => this.getRow({index, style: {}}))
           ) : (
             <AutoSizer>
               {({width, height}) => (
-                <ContextMenu
-                  buildItems={
-                    this.props.buildContextMenuItems ||
-                    this.buildContextMenuItems
-                  }>
+                <ContextMenu buildItems={this.buildContextMenuItems}>
                   <List
                     itemCount={rows.length}
                     itemSize={index =>

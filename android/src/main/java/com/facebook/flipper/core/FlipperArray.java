@@ -16,11 +16,11 @@ import org.json.JSONObject;
 public class FlipperArray {
   final JSONArray mJson;
 
-  public FlipperArray(JSONArray json) {
+  FlipperArray(JSONArray json) {
     mJson = (json != null ? json : new JSONArray());
   }
 
-  public FlipperArray(String json) {
+  FlipperArray(String json) {
     try {
       mJson = new JSONArray(json);
     } catch (JSONException e) {

@@ -6,6 +6,8 @@
  */
 
 import {transform} from '@babel/core';
+import generate from '@babel/generator';
+
 import electronStubs from '../electron-stubs';
 
 const babelOptions = {
@@ -20,4 +22,15 @@ test('transform electron requires to inlined stubs', () => {
   const body = transformed.program.body[0];
   expect(body.type).toBe('ExpressionStatement');
   expect(body.expression.properties.map(p => p.key.name)).toContain('remote');
+});
+
+test('transform performance calls to requires', () => {
+  for (const method of ['mark', 'measure']) {
+    const src = `performance.${method}('something')`;
+    const transformed = transform(src, babelOptions).ast;
+    const {code} = generate(transformed);
+    expect(code).toBe(
+      `require('perf_hooks').performance.${method}('something');`,
+    );
+  }
 });

@@ -12,6 +12,7 @@ import type {Request, Response, Header} from './index.js';
 import {
   Component,
   FlexColumn,
+  FlexRow,
   ManagedTable,
   ManagedDataInspector,
   Text,
@@ -23,8 +24,6 @@ import {
 import {getHeaderValue} from './index.js';
 
 import querystring from 'querystring';
-// $FlowFixMe
-import xmlBeautifier from 'xml-beautifier';
 
 const WrappingText = styled(Text)({
   wordWrap: 'break-word',
@@ -62,16 +61,11 @@ function decodeBody(container: Request | Response): string {
   if (!container.data) {
     return '';
   }
-
   const b64Decoded = atob(container.data);
-  const body =
-    getHeaderValue(container.headers, 'Content-Encoding') === 'gzip'
-      ? decompress(b64Decoded)
-      : b64Decoded;
 
-  // Data is transferred as base64 encoded bytes to support unicode characters,
-  // we need to decode the bytes here to display the correct unicode characters.
-  return decodeURIComponent(escape(body));
+  return getHeaderValue(container.headers, 'Content-Encoding') === 'gzip'
+    ? decompress(b64Decoded)
+    : b64Decoded;
 }
 
 function decompress(body: string): string {
@@ -229,13 +223,14 @@ export default class RequestDetails extends Component<
             ]
           : null}
         <Panel heading={'Options'} floating={false} collapsed={true}>
-          <Select
-            grow
-            label="Body"
-            selected={bodyFormat}
-            onChange={this.onSelectFormat}
-            options={RequestDetails.BodyOptions}
-          />
+          <FlexRow>
+            <Text>Body: </Text>
+            <Select
+              selected={bodyFormat}
+              onChange={this.onSelectFormat}
+              options={RequestDetails.BodyOptions}
+            />
+          </FlexRow>
         </Panel>
       </RequestDetails.Container>
     );
@@ -341,23 +336,24 @@ class RequestBodyInspector extends Component<{
     const {request, formattedText} = this.props;
     const bodyFormatters = formattedText ? TextBodyFormatters : BodyFormatters;
     let component;
-    for (const formatter of bodyFormatters) {
-      if (formatter.formatRequest) {
-        try {
+    try {
+      for (const formatter of bodyFormatters) {
+        if (formatter.formatRequest) {
           component = formatter.formatRequest(request);
           if (component) {
             break;
           }
-        } catch (e) {
-          console.warn(
-            'BodyFormatter exception from ' + formatter.constructor.name,
-            e.message,
-          );
         }
       }
+    } catch (e) {}
+
+    if (component == null && request.data != null) {
+      component = <Text>{decodeBody(request)}</Text>;
     }
 
-    component = component || <Text>{decodeBody(request)}</Text>;
+    if (component == null) {
+      return null;
+    }
 
     return <BodyContainer>{component}</BodyContainer>;
   }
@@ -372,21 +368,16 @@ class ResponseBodyInspector extends Component<{
     const {request, response, formattedText} = this.props;
     const bodyFormatters = formattedText ? TextBodyFormatters : BodyFormatters;
     let component;
-    for (const formatter of bodyFormatters) {
-      if (formatter.formatResponse) {
-        try {
+    try {
+      for (const formatter of bodyFormatters) {
+        if (formatter.formatResponse) {
           component = formatter.formatResponse(request, response);
           if (component) {
             break;
           }
-        } catch (e) {
-          console.warn(
-            'BodyFormatter exception from ' + formatter.constructor.name,
-            e.message,
-          );
         }
       }
-    }
+    } catch (e) {}
 
     component = component || <Text>{decodeBody(response)}</Text>;
 
@@ -412,7 +403,8 @@ type ImageWithSizeState = {
 class ImageWithSize extends Component<ImageWithSizeProps, ImageWithSizeState> {
   static Image = styled('img')({
     objectFit: 'scale-down',
-    maxWidth: '100%',
+    maxWidth: 500,
+    maxHeight: 500,
     marginBottom: 10,
   });
 
@@ -498,22 +490,6 @@ class JSONText extends Component<{children: any}> {
   }
 }
 
-class XMLText extends Component<{body: any}> {
-  static NoScrollbarText = styled(Text)({
-    overflowY: 'hidden',
-  });
-
-  render() {
-    const xmlPretty = xmlBeautifier(this.props.body);
-    return (
-      <XMLText.NoScrollbarText code whiteSpace="pre" selectable>
-        {xmlPretty}
-        {'\n'}
-      </XMLText.NoScrollbarText>
-    );
-  }
-}
-
 class JSONTextFormatter {
   formatRequest = (request: Request) => {
     return this.format(
@@ -545,28 +521,6 @@ class JSONTextFormatter {
           .map(json => JSON.parse(json))
           .map(data => <JSONText>{data}</JSONText>);
       }
-    }
-  };
-}
-
-class XMLTextFormatter {
-  formatRequest = (request: Request) => {
-    return this.format(
-      decodeBody(request),
-      getHeaderValue(request.headers, 'content-type'),
-    );
-  };
-
-  formatResponse = (request: Request, response: Response) => {
-    return this.format(
-      decodeBody(response),
-      getHeaderValue(response.headers, 'content-type'),
-    );
-  };
-
-  format = (body: string, contentType: string) => {
-    if (contentType.startsWith('text/html')) {
-      return <XMLText body={body} />;
     }
   };
 }
@@ -653,43 +607,6 @@ class GraphQLFormatter {
       return <ManagedDataInspector expandRoot={true} data={data} />;
     }
   };
-
-  formatResponse = (request: Request, response: Response) => {
-    return this.format(
-      decodeBody(response),
-      getHeaderValue(response.headers, 'content-type'),
-    );
-  };
-
-  format = (body: string, contentType: string) => {
-    if (
-      contentType.startsWith('application/json') ||
-      contentType.startsWith('text/javascript') ||
-      contentType.startsWith('text/html') ||
-      contentType.startsWith('application/x-fb-flatbuffer')
-    ) {
-      try {
-        const data = JSON.parse(body);
-        return (
-          <ManagedDataInspector
-            collapsed={true}
-            expandRoot={true}
-            data={data}
-          />
-        );
-      } catch (SyntaxError) {
-        // Multiple top level JSON roots, map them one by one
-        const roots = body.replace(/}{/g, '}\r\n{').split('\n');
-        return (
-          <ManagedDataInspector
-            collapsed={true}
-            expandRoot={true}
-            data={roots.map(json => JSON.parse(json))}
-          />
-        );
-      }
-    }
-  };
 }
 
 class FormUrlencodedFormatter {
@@ -714,7 +631,6 @@ const BodyFormatters: Array<BodyFormatter> = [
   new GraphQLFormatter(),
   new JSONFormatter(),
   new FormUrlencodedFormatter(),
-  new XMLTextFormatter(),
 ];
 
 const TextBodyFormatters: Array<BodyFormatter> = [new JSONTextFormatter()];

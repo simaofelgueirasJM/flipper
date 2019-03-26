@@ -29,7 +29,6 @@ const BUILTINS = [
   'assert',
   'util',
   'path',
-  'perf_hooks',
   'punycode',
   'querystring',
   'cluster',

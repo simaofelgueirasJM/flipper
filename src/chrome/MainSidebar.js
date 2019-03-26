@@ -8,12 +8,9 @@
 import {FlipperBasePlugin} from '../plugin.js';
 import type BaseDevice from '../devices/BaseDevice.js';
 import type Client from '../Client.js';
-import type {UninitializedClient} from '../UninitializedClient.js';
 import type {PluginNotification} from '../reducers/notifications';
-import type {ActiveSheet} from '../reducers/application';
 
 import {
-  PureComponent,
   Component,
   Sidebar,
   FlexBox,
@@ -22,17 +19,14 @@ import {
   Text,
   Glyph,
   styled,
-  FlexColumn,
   GK,
   FlipperPlugin,
   FlipperDevicePlugin,
-  LoadingIndicator,
 } from 'flipper';
 import React from 'react';
+import {devicePlugins, clientPlugins} from '../plugins/index.js';
 import NotificationsHub from '../NotificationsHub.js';
 import {selectPlugin} from '../reducers/connections.js';
-import {setActiveSheet} from '../reducers/application.js';
-import UserAccount from './UserAccount.js';
 import {connect} from 'react-redux';
 
 const ListItem = styled('div')(({active}) => ({
@@ -101,21 +95,6 @@ const PluginName = styled(Text)(props => ({
   },
 }));
 
-const Plugins = styled(FlexColumn)({
-  flexGrow: 1,
-  overflow: 'auto',
-});
-
-const PluginDebugger = styled(FlexBox)(props => ({
-  color: colors.blackAlpha50,
-  alignItems: 'center',
-  padding: 10,
-  flexShrink: 0,
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-}));
-
 function PluginIcon({
   isActive,
   backgroundColor,
@@ -165,27 +144,14 @@ class PluginSidebarListItem extends Component<{
       <ListItem active={isActive} onClick={this.props.onClick}>
         <PluginIcon
           isActive={isActive}
-          name={plugin.icon || 'apps'}
+          name={plugin.icon}
           backgroundColor={iconColor}
           color={colors.white}
         />
-        <PluginName>{plugin.title || plugin.id}</PluginName>
+        <PluginName>{plugin.title}</PluginName>
       </ListItem>
     );
   }
-}
-
-const Spinner = centerInSidebar(LoadingIndicator);
-
-const ErrorIndicator = centerInSidebar(Glyph);
-
-function centerInSidebar(component) {
-  return styled(component)({
-    marginTop: '10px',
-    marginBottom: '10px',
-    marginLeft: 'auto',
-    marginRight: 'auto',
-  });
 }
 
 type MainSidebarProps = {|
@@ -193,24 +159,16 @@ type MainSidebarProps = {|
   selectedApp: ?string,
   selectedDevice: ?BaseDevice,
   windowIsFocused: boolean,
-  selectPlugin: (payload: {|
+  selectPlugin: (payload: {
     selectedPlugin: ?string,
     selectedApp: ?string,
-    deepLinkPayload: ?string,
-  |}) => void,
+  }) => void,
   clients: Array<Client>,
-  uninitializedClients: Array<{
-    client: UninitializedClient,
-    deviceId?: string,
-    errorMessage?: string,
-  }>,
-  numNotifications: number,
-  devicePlugins: Map<string, Class<FlipperDevicePlugin<>>>,
-  clientPlugins: Map<string, Class<FlipperPlugin<>>>,
-  setActiveSheet: (activeSheet: ActiveSheet) => void,
+  activeNotifications: Array<PluginNotification>,
+  blacklistedPlugins: Array<string>,
 |};
 
-class MainSidebar extends PureComponent<MainSidebarProps> {
+class MainSidebar extends Component<MainSidebarProps> {
   render() {
     const {
       selectedDevice,
@@ -218,9 +176,10 @@ class MainSidebar extends PureComponent<MainSidebarProps> {
       selectedApp,
       selectPlugin,
       windowIsFocused,
-      numNotifications,
+      activeNotifications,
     } = this.props;
-    let {clients, uninitializedClients} = this.props;
+    let {clients} = this.props;
+
     clients = clients
       .filter(
         (client: Client) =>
@@ -228,8 +187,10 @@ class MainSidebar extends PureComponent<MainSidebarProps> {
       )
       .sort((a, b) => (a.query.app || '').localeCompare(b.query.app));
 
-    const byPluginNameOrId = (a, b) =>
-      (a.title || a.id) > (b.title || b.id) ? 1 : -1;
+    let blacklistedPlugins = new Set(this.props.blacklistedPlugins);
+    const notifications = activeNotifications.filter(
+      (n: PluginNotification) => !blacklistedPlugins.has(n.pluginId),
+    );
 
     return (
       <Sidebar
@@ -238,149 +199,103 @@ class MainSidebar extends PureComponent<MainSidebarProps> {
         backgroundColor={
           process.platform === 'darwin' && windowIsFocused ? 'transparent' : ''
         }>
-        <Plugins>
-          {!GK.get('flipper_disable_notifications') && (
-            <ListItem
-              active={selectedPlugin === 'notifications'}
-              onClick={() =>
-                selectPlugin({
-                  selectedPlugin: 'notifications',
-                  selectedApp: null,
-                  deepLinkPayload: null,
-                })
-              }>
-              <PluginIcon
-                color={colors.light50}
-                name={
-                  numNotifications > 0
-                    ? NotificationsHub.icon || 'bell'
-                    : 'bell-null'
+        {!GK.get('flipper_disable_notifications') && (
+          <ListItem
+            active={selectedPlugin === 'notifications'}
+            onClick={() =>
+              selectPlugin({
+                selectedPlugin: 'notifications',
+                selectedApp: null,
+              })
+            }>
+            <PluginIcon
+              color={colors.light50}
+              name={
+                notifications.length > 0 ? NotificationsHub.icon : 'bell-null'
+              }
+              isActive={selectedPlugin === NotificationsHub.id}
+            />
+            <PluginName
+              count={notifications.length}
+              isActive={selectedPlugin === NotificationsHub.id}>
+              {NotificationsHub.title}
+            </PluginName>
+          </ListItem>
+        )}
+        {selectedDevice && (
+          <SidebarHeader>{selectedDevice.title}</SidebarHeader>
+        )}
+        {selectedDevice &&
+          devicePlugins
+            .filter(plugin => plugin.supportsDevice(selectedDevice))
+            .map((plugin: Class<FlipperDevicePlugin<>>) => (
+              <PluginSidebarListItem
+                key={plugin.id}
+                isActive={plugin.id === selectedPlugin}
+                onClick={() =>
+                  selectPlugin({
+                    selectedPlugin: plugin.id,
+                    selectedApp: null,
+                  })
                 }
-                isActive={selectedPlugin === NotificationsHub.id}
+                plugin={plugin}
               />
-              <PluginName
-                count={numNotifications}
-                isActive={selectedPlugin === NotificationsHub.id}>
-                {NotificationsHub.title}
-              </PluginName>
-            </ListItem>
-          )}
-          {selectedDevice && (
-            <SidebarHeader>{selectedDevice.title}</SidebarHeader>
-          )}
-          {selectedDevice &&
-            Array.from(this.props.devicePlugins.values())
-              .filter(plugin => plugin.supportsDevice(selectedDevice))
-              .sort(byPluginNameOrId)
-              .map((plugin: Class<FlipperDevicePlugin<>>) => (
-                <PluginSidebarListItem
-                  key={plugin.id}
-                  isActive={plugin.id === selectedPlugin}
-                  onClick={() =>
-                    selectPlugin({
-                      selectedPlugin: plugin.id,
-                      selectedApp: null,
-                      deepLinkPayload: null,
-                    })
-                  }
-                  plugin={plugin}
-                />
-              ))}
-          {clients
-            .filter(
-              (client: Client) =>
-                (selectedDevice &&
-                  client.query.device_id === selectedDevice.serial) ||
-                // Old android sdk versions don't know their device_id
-                // Display their plugins under all selected devices until they die out
-                client.query.device_id === 'unknown',
-            )
-            .map((client: Client) => (
-              <React.Fragment key={client.id}>
-                <SidebarHeader>{client.query.app}</SidebarHeader>
-                {Array.from(this.props.clientPlugins.values())
-                  .filter(
-                    (p: Class<FlipperPlugin<>>) =>
-                      client.plugins.indexOf(p.id) > -1,
-                  )
-                  .sort(byPluginNameOrId)
-                  .map((plugin: Class<FlipperPlugin<>>) => (
-                    <PluginSidebarListItem
-                      key={plugin.id}
-                      isActive={
-                        plugin.id === selectedPlugin &&
-                        selectedApp === client.id
-                      }
-                      onClick={() =>
-                        selectPlugin({
-                          selectedPlugin: plugin.id,
-                          selectedApp: client.id,
-                          deepLinkPayload: null,
-                        })
-                      }
-                      plugin={plugin}
-                      app={client.query.app}
-                    />
-                  ))}
-              </React.Fragment>
             ))}
-          {uninitializedClients.map(entry => (
-            <React.Fragment key={JSON.stringify(entry.client)}>
-              <SidebarHeader>{entry.client.appName}</SidebarHeader>
-              {entry.errorMessage ? (
-                <ErrorIndicator name={'mobile-cross'} size={16} />
-              ) : (
-                <Spinner size={16} />
-              )}
+        {clients
+          .filter(
+            (client: Client) =>
+              (selectedDevice &&
+                client.query.device_id === selectedDevice.serial) ||
+              // Old android sdk versions don't know their device_id
+              // Display their plugins under all selected devices until they die out
+              client.query.device_id === 'unknown',
+          )
+          .map((client: Client) => (
+            <React.Fragment key={client.id}>
+              <SidebarHeader>{client.query.app}</SidebarHeader>
+              {clientPlugins
+                .filter(
+                  (p: Class<FlipperPlugin<>>) =>
+                    client.plugins.indexOf(p.id) > -1,
+                )
+                .map((plugin: Class<FlipperPlugin<>>) => (
+                  <PluginSidebarListItem
+                    key={plugin.id}
+                    isActive={
+                      plugin.id === selectedPlugin && selectedApp === client.id
+                    }
+                    onClick={() =>
+                      selectPlugin({
+                        selectedPlugin: plugin.id,
+                        selectedApp: client.id,
+                      })
+                    }
+                    plugin={plugin}
+                    app={client.query.app}
+                  />
+                ))}
             </React.Fragment>
           ))}
-        </Plugins>
-        <PluginDebugger
-          onClick={() => this.props.setActiveSheet('PLUGIN_DEBUGGER')}>
-          <Glyph
-            name="question-circle"
-            size={16}
-            variant="outline"
-            color={colors.blackAlpha30}
-          />
-          &nbsp;Plugin not showing?
-        </PluginDebugger>
-        <UserAccount />
       </Sidebar>
     );
   }
 }
 
-export default connect<MainSidebarProps, {||}, _, _, _, _>(
+export default connect(
   ({
     application: {windowIsFocused},
-    connections: {
-      selectedDevice,
-      selectedPlugin,
-      selectedApp,
-      clients,
-      uninitializedClients,
-    },
+    connections: {selectedDevice, selectedPlugin, selectedApp, clients},
     notifications: {activeNotifications, blacklistedPlugins},
-    plugins: {devicePlugins, clientPlugins},
   }) => ({
-    numNotifications: (() => {
-      const blacklist = new Set(blacklistedPlugins);
-      return activeNotifications.filter(
-        (n: PluginNotification) => !blacklist.has(n.pluginId),
-      ).length;
-    })(),
+    blacklistedPlugins,
+    activeNotifications,
     windowIsFocused,
     selectedDevice,
     selectedPlugin,
     selectedApp,
     clients,
-    uninitializedClients,
-    devicePlugins,
-    clientPlugins,
   }),
   {
     selectPlugin,
-    setActiveSheet,
   },
 )(MainSidebar);

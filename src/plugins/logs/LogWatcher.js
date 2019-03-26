@@ -5,8 +5,6 @@
  * @format
  */
 
-import type {TableBodyRow} from 'flipper';
-
 import {
   PureComponent,
   FlexColumn,
@@ -131,7 +129,7 @@ export default class LogWatcher extends PureComponent<Props, State> {
     this.props.onChange(newCounters);
   };
 
-  buildRows = (): Array<TableBodyRow> => {
+  buildRows = () => {
     return this.props.counters.map(({label, count, notify}, i) => ({
       columns: {
         expression: {

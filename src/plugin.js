@@ -7,37 +7,21 @@
 
 import type {KeyboardActions} from './MenuBar.js';
 import type {App} from './App.js';
-import type {Logger} from './fb-interfaces/Logger.js';
+import type Logger from './fb-stubs/Logger.js';
 import type Client from './Client.js';
-import type {Store} from './reducers/index.js';
 
 import React from 'react';
 import type {Node} from 'react';
 import BaseDevice from './devices/BaseDevice.js';
-import AndroidDevice from './devices/AndroidDevice';
-import IOSDevice from './devices/IOSDevice';
+import {AndroidDevice, IOSDevice} from 'flipper';
 
 const invariant = require('invariant');
 
-// This function is intended to be called from outside of the plugin.
-// If you want to `call` from the plugin use, this.client.call
-export function callClient(
-  client: Client,
-  id: string,
-): (string, ?Object) => Promise<Object> {
-  return (method, params) => client.call(id, method, false, params);
-}
-
-export interface PluginClient {
-  // eslint-disable-next-line
-  send(method: string, params?: Object): void;
-  // eslint-disable-next-line
-  call(method: string, params?: Object): Promise<any>;
-  // eslint-disable-next-line
-  subscribe(method: string, callback: (params: any) => void): void;
-  // eslint-disable-next-line
-  supportsMethod(method: string): Promise<boolean>;
-}
+export type PluginClient = {|
+  send: (method: string, params?: Object) => void,
+  call: (method: string, params?: Object) => Promise<any>,
+  subscribe: (method: string, callback: (params: any) => void) => void,
+|};
 
 type PluginTarget = BaseDevice | Client;
 
@@ -58,7 +42,6 @@ export type Props<T> = {
   target: PluginTarget,
   deepLinkPayload: ?string,
   selectPlugin: (pluginID: string, deepLinkPayload: ?string) => boolean,
-  isArchivedDevice: boolean,
 };
 
 export class FlipperBasePlugin<
@@ -66,39 +49,13 @@ export class FlipperBasePlugin<
   Actions = *,
   PersistedState = *,
 > extends React.Component<Props<PersistedState>, State> {
-  static title: ?string = null;
-  static id: string = '';
-  static icon: ?string = null;
-  static gatekeeper: ?string = null;
-  static entry: ?string = null;
-  static bugs: ?{
-    email?: string,
-    url?: string,
-  } = null;
+  static title: string = 'Unknown';
+  static id: string = 'Unknown';
+  static icon: string = 'apps';
   static keyboardActions: ?KeyboardActions;
   static screenshot: ?string;
   static defaultPersistedState: PersistedState;
-  static persistedStateReducer: ?(
-    persistedState: PersistedState,
-    method: string,
-    data: Object,
-  ) => $Shape<PersistedState>;
-  static exportPersistedState: ?(
-    callClient: (string, ?Object) => Promise<Object>,
-    persistedState: ?PersistedState,
-    store: ?Store,
-  ) => Promise<?PersistedState>;
-  static getActiveNotifications: ?(
-    persistedState: PersistedState,
-  ) => Array<Notification>;
-  static onRegisterDevice: ?(
-    store: Store,
-    baseDevice: BaseDevice,
-    setPersistedState: (
-      pluginKey: string,
-      newPluginState: ?PersistedState,
-    ) => void,
-  ) => void;
+
   // forbid instance properties that should be static
   title: empty;
   id: empty;
@@ -114,7 +71,7 @@ export class FlipperBasePlugin<
   onKeyboardAction: ?(action: string) => void;
 
   toJSON() {
-    return `<${this.constructor.name}#${this.constructor.id}>`;
+    return `<${this.constructor.name}#${this.constructor.title}>`;
   }
 
   // methods to be overriden by plugins
@@ -172,6 +129,13 @@ export class FlipperPlugin<S = *, A = *, P = *> extends FlipperBasePlugin<
   A,
   P,
 > {
+  static persistedStateReducer: ?(
+    persistedState: P,
+    method: string,
+    data: Object,
+  ) => $Shape<P>;
+  static getActiveNotifications: ?(persistedState: P) => Array<Notification>;
+
   constructor(props: Props<*>) {
     super(props);
     const {id} = this.constructor;
@@ -179,7 +143,7 @@ export class FlipperPlugin<S = *, A = *, P = *> extends FlipperBasePlugin<
     // $FlowFixMe props.target will be instance of Client
     this.realClient = props.target;
     this.client = {
-      call: (method, params) => this.realClient.call(id, method, true, params),
+      call: (method, params) => this.realClient.call(id, method, params),
       send: (method, params) => this.realClient.send(id, method, params),
       subscribe: (method, callback) => {
         this.subscriptions.push({
@@ -188,7 +152,6 @@ export class FlipperPlugin<S = *, A = *, P = *> extends FlipperBasePlugin<
         });
         this.realClient.subscribe(id, method, callback);
       },
-      supportsMethod: method => this.realClient.supportsMethod(id, method),
     };
   }
 
@@ -230,12 +193,12 @@ export class FlipperPlugin<S = *, A = *, P = *> extends FlipperBasePlugin<
     // run plugin teardown
     this.teardown();
     if (this.realClient.connected) {
-      this.realClient.deinitPlugin(this.constructor.id);
+      this.realClient.rawSend('deinit', {plugin: this.constructor.id});
     }
   }
 
   _init() {
-    this.realClient.initPlugin(this.constructor.id);
+    this.realClient.rawSend('init', {plugin: this.constructor.id});
     this.init();
   }
 }

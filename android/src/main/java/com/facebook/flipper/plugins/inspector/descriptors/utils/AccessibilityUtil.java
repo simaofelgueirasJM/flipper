@@ -1,9 +1,11 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
+/*
+ *  Copyright (c) 2018-present, Facebook, Inc.
  *
- * This source code is licensed under the MIT license found in the LICENSE
- * file in the root directory of this source tree.
+ *  This source code is licensed under the MIT license found in the LICENSE
+ *  file in the root directory of this source tree.
+ *
  */
+
 package com.facebook.flipper.plugins.inspector.descriptors.utils;
 
 import static android.content.Context.ACCESSIBILITY_SERVICE;
@@ -11,14 +13,14 @@ import static android.content.Context.ACCESSIBILITY_SERVICE;
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.Build;
+import android.support.v4.view.ViewCompat;
+import android.support.v4.view.accessibility.AccessibilityNodeInfoCompat;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.accessibility.AccessibilityManager;
 import android.widget.EditText;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import com.facebook.flipper.core.FlipperArray;
 import com.facebook.flipper.core.FlipperObject;
 import com.facebook.flipper.plugins.inspector.InspectorValue;
@@ -466,7 +468,10 @@ public final class AccessibilityUtil {
 
       StringBuilder talkbackSegments = new StringBuilder();
       AccessibilityRoleUtil.AccessibilityRole role = AccessibilityRoleUtil.getRole(view);
-      String roleString = getRoleDescription(view);
+      String roleString = (String) node.getRoleDescription();
+      if (roleString == null) {
+        roleString = role.getRoleString();
+      }
       boolean disabled =
           AccessibilityEvaluationUtil.isActionableForAccessibility(node) && !node.isEnabled();
 
@@ -576,7 +581,6 @@ public final class AccessibilityUtil {
         .put("accessibility-focused", nodeInfo.isAccessibilityFocused())
         .put("checkable", nodeInfo.isCheckable())
         .put("checked", nodeInfo.isChecked())
-        .put("class-name", nodeInfo.getClassName())
         .put("clickable", nodeInfo.isClickable())
         .put("content-description", nodeInfo.getContentDescription())
         .put("content-invalid", nodeInfo.isContentInvalid())
@@ -594,8 +598,7 @@ public final class AccessibilityUtil {
         .put("scrollable", nodeInfo.isScrollable())
         .put("selected", nodeInfo.isSelected())
         .put("text", nodeInfo.getText())
-        .put("visible-to-user", nodeInfo.isVisibleToUser())
-        .put("role-description", getRoleDescription(nodeInfo));
+        .put("visible-to-user", nodeInfo.isVisibleToUser());
 
     nodeInfo.getBoundsInParent(bounds);
     nodeInfoProps.put(
@@ -664,8 +667,6 @@ public final class AccessibilityUtil {
     CharSequence contentDescription =
         view.getContentDescription() != null ? view.getContentDescription() : "";
     props
-        .put("role", AccessibilityRoleUtil.getRole(view).toString())
-        .put("role-description", InspectorValue.mutable(getRoleDescription(view)))
         .put("content-description", InspectorValue.mutable(contentDescription))
         .put("focusable", InspectorValue.mutable(view.isFocusable()))
         .put("selected", InspectorValue.mutable(view.isSelected()))
@@ -706,35 +707,5 @@ public final class AccessibilityUtil {
           .put("talkback-hint", hint)
           .build();
     }
-  }
-
-  public static String getRoleDescription(View view) {
-    AccessibilityNodeInfoCompat nodeInfo = ViewAccessibilityHelper.createNodeInfoFromView(view);
-    String roleDescription = getRoleDescription(nodeInfo);
-    nodeInfo.recycle();
-
-    if (roleDescription == null || roleDescription == "") {
-      AccessibilityRoleUtil.AccessibilityRole role = AccessibilityRoleUtil.getRole(view);
-      roleDescription = role.getRoleString();
-    }
-
-    return roleDescription;
-  }
-
-  public static @Nullable String getRoleDescription(AccessibilityNodeInfoCompat nodeInfo) {
-    if (nodeInfo == null) {
-      return null;
-    }
-
-    // Custom role descriptions are only supported in support library version
-    // 24.1 and higher, but there is no way to get support library version
-    // info at runtime.
-    try {
-      return (String) nodeInfo.getRoleDescription();
-    } catch (NullPointerException e) {
-      // no-op
-    }
-
-    return null;
   }
 }

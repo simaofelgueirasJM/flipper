@@ -17,7 +17,7 @@ export {default as ButtonGroup} from './components/ButtonGroup.js';
 export {colors, darkColors, brandColors} from './components/colors.js';
 
 //
-export {default as Glyph} from './components/Glyph.js';
+export {default as Glyph, ColoredIcon} from './components/Glyph.js';
 
 //
 export {default as LoadingIndicator} from './components/LoadingIndicator.js';
@@ -34,7 +34,6 @@ export type {
   TableHighlightedRows,
   TableRowSortOrder,
   TableColumnOrder,
-  TableColumnOrderVal,
   TableColumnSizes,
 } from './components/table/types.js';
 export {default as ManagedTable} from './components/table/ManagedTable.js';
@@ -87,6 +86,8 @@ export {
   default as ContextMenuProvider,
 } from './components/ContextMenuProvider.js';
 export {default as ContextMenu} from './components/ContextMenu.js';
+export {default as InlineContextMenu} from './components/InlineContextMenu.js';
+export {default as Dropdown} from './components/Dropdown.js';
 
 // file
 export type {FileListFile, FileListFiles} from './components/FileList.js';
@@ -132,10 +133,6 @@ export {default as Heading} from './components/Heading.js';
 // filters
 export type {Filter} from './components/filter/types.js';
 
-export {default as MarkerTimeline} from './components/MarkerTimeline.js';
-
-export {default as StackTrace} from './components/StackTrace.js';
-
 //
 export {
   SearchBox,
@@ -166,5 +163,3 @@ export {
 export {InspectorSidebar} from './components/elements-inspector/sidebar.js';
 
 export {Console} from './components/console.js';
-
-export {default as Sheet} from './components/Sheet.js';

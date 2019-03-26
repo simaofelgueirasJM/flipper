@@ -55,9 +55,4 @@
     [self.navigationController pushViewController:communicationDemoViewController animated:true];
 }
 
-- (IBAction)tappedCauseCrash:(UIButton *)sender {
-  NSArray *arr = @[];
-  [arr objectAtIndex:10];
-}
-
 @end

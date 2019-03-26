@@ -8,8 +8,6 @@
 const generate = require('@babel/generator').default;
 const babylon = require('@babel/parser');
 const babel = require('@babel/core');
-const fs = require('fs');
-const path = require('path');
 
 function transform({filename, options, src}) {
   const presets = [require('../node_modules/@babel/preset-react')];
@@ -20,7 +18,7 @@ function transform({filename, options, src}) {
     filename,
     plugins: [
       'jsx',
-      ['flow', {all: true}],
+      'flow',
       'classProperties',
       'objectRestSpread',
       'optionalChaining',
@@ -35,21 +33,11 @@ function transform({filename, options, src}) {
     require('../node_modules/@babel/plugin-proposal-class-properties'),
     require('../node_modules/@babel/plugin-transform-flow-strip-types'),
     require('../node_modules/@babel/plugin-proposal-optional-chaining'),
+    require('./fb-stubs.js'),
     require('./dynamic-requires.js'),
   ];
 
-  if (
-    fs.existsSync(
-      path.resolve(path.dirname(path.dirname(__dirname)), 'src', 'fb'),
-    )
-  ) {
-    plugins.push(require('./fb-stubs.js'));
-  }
-
-  if (process.env.BUILD_HEADLESS) {
-    plugins.push(require('./electron-stubs.js'));
-    plugins.push(require('./electron-requires.js'));
-  } else if (options.isTestRunner) {
+  if (options.isTestRunner) {
     if (process.env.USE_ELECTRON_STUBS) {
       plugins.push(require('./electron-stubs.js'));
     }
@@ -99,10 +87,6 @@ function transform({filename, options, src}) {
 
 module.exports = {
   transform,
-  // Disable caching of babel transforms all together. We haven't found a good
-  // way to cache our transforms, as they rely on side effects like env vars or
-  // the existence of folders in the file system.
-  getCacheKey: () => Math.random().toString(36),
   process(src, filename, config, options) {
     return transform({
       src,

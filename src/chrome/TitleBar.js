@@ -5,8 +5,6 @@
  * @format
  */
 
-import type {ActiveSheet} from '../reducers/application';
-
 import {
   colors,
   Button,
@@ -14,23 +12,20 @@ import {
   FlexRow,
   Component,
   Spacer,
+  GK,
   styled,
-  Text,
-  LoadingIndicator,
 } from 'flipper';
 import {connect} from 'react-redux';
 import {
-  setActiveSheet,
+  toggleBugDialogVisible,
   toggleLeftSidebarVisible,
   toggleRightSidebarVisible,
-  ACTIVE_SHEET_BUG_REPORTER,
+  togglePluginManagerVisible,
 } from '../reducers/application.js';
 import DevicesButton from './DevicesButton.js';
 import ScreenCaptureButtons from './ScreenCaptureButtons.js';
 import AutoUpdateVersion from './AutoUpdateVersion.js';
 import config from '../fb-stubs/config.js';
-import {isAutoUpdaterEnabled} from '../utils/argvUtils.js';
-import isProduction from '../utils/isProduction.js';
 
 const AppTitleBar = styled(FlexRow)(({focused}) => ({
   background: focused
@@ -49,36 +44,19 @@ const AppTitleBar = styled(FlexRow)(({focused}) => ({
   paddingRight: 10,
   justifyContent: 'space-between',
   WebkitAppRegion: 'drag',
-  zIndex: 4,
 }));
 
-type OwnProps = {|
-  version: string,
-|};
-
 type Props = {|
-  ...OwnProps,
   windowIsFocused: boolean,
   leftSidebarVisible: boolean,
   rightSidebarVisible: boolean,
   rightSidebarAvailable: boolean,
-  downloadingImportData: boolean,
+  pluginManagerVisible: boolean,
+  toggleBugDialogVisible: (visible?: boolean) => void,
   toggleLeftSidebarVisible: (visible?: boolean) => void,
   toggleRightSidebarVisible: (visible?: boolean) => void,
-  setActiveSheet: (sheet: ActiveSheet) => void,
+  togglePluginManagerVisible: (visible?: boolean) => void,
 |};
-
-const VersionText = styled(Text)({
-  color: colors.light50,
-  marginLeft: 4,
-  marginTop: 2,
-});
-
-const Importing = styled(FlexRow)({
-  color: colors.light50,
-  alignItems: 'center',
-  marginLeft: 10,
-});
 
 class TitleBar extends Component<Props> {
   render() {
@@ -86,27 +64,23 @@ class TitleBar extends Component<Props> {
       <AppTitleBar focused={this.props.windowIsFocused} className="toolbar">
         <DevicesButton />
         <ScreenCaptureButtons />
-        {this.props.downloadingImportData && (
-          <Importing>
-            <LoadingIndicator size={16} />
-            &nbsp;Importing data...
-          </Importing>
-        )}
         <Spacer />
-        <VersionText>
-          {this.props.version}
-          {isProduction() ? '' : '-dev'}
-        </VersionText>
-
-        {isAutoUpdaterEnabled() ? (
-          <AutoUpdateVersion version={this.props.version} />
-        ) : null}
+        {process.platform === 'darwin' ? <AutoUpdateVersion /> : null}
         {config.bugReportButtonVisible && (
           <Button
             compact={true}
-            onClick={() => this.props.setActiveSheet(ACTIVE_SHEET_BUG_REPORTER)}
+            onClick={() => this.props.toggleBugDialogVisible()}
             title="Report Bug"
             icon="bug"
+          />
+        )}
+        {GK.get('sonar_dynamic_plugins') && (
+          <Button
+            compact={true}
+            onClick={() => this.props.toggleBugDialogVisible()}
+            selected={this.props.pluginManagerVisible}
+            title="Plugin Manager"
+            icon="apps"
           />
         )}
         <ButtonGroup>
@@ -133,25 +107,26 @@ class TitleBar extends Component<Props> {
   }
 }
 
-export default connect<Props, OwnProps, _, _, _, _>(
+export default connect(
   ({
     application: {
       windowIsFocused,
       leftSidebarVisible,
       rightSidebarVisible,
       rightSidebarAvailable,
-      downloadingImportData,
+      pluginManagerVisible,
     },
   }) => ({
     windowIsFocused,
     leftSidebarVisible,
     rightSidebarVisible,
     rightSidebarAvailable,
-    downloadingImportData,
+    pluginManagerVisible,
   }),
   {
-    setActiveSheet,
+    toggleBugDialogVisible,
     toggleLeftSidebarVisible,
     toggleRightSidebarVisible,
+    togglePluginManagerVisible,
   },
 )(TitleBar);

@@ -84,15 +84,11 @@
   __weak FlipperKitLayoutPlugin *weakSelf = self;
 
   [connection receive:@"getRoot" withBlock:^(NSDictionary *params, id<FlipperResponder> responder) {
-    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallGetRoot: responder]; }, responder);
-  }];
-  
-  [connection receive:@"getAllNodes" withBlock:^(NSDictionary *params, id<FlipperResponder> responder) {
-    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallGetAllNodesWithResponder: responder]; }, responder);
+    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallGetRoot: responder]; });
   }];
 
   [connection receive:@"getNodes" withBlock:^(NSDictionary *params, id<FlipperResponder> responder) {
-    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallGetNodes: params[@"ids"] withResponder: responder]; }, responder);
+    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallGetNodes: params[@"ids"] withResponder: responder]; });
   }];
 
   [connection receive:@"setData" withBlock:^(NSDictionary *params, id<FlipperResponder> responder) {
@@ -101,27 +97,27 @@
                  withPath: params[@"path"]
                   toValue: params[@"value"]
            withConnection: connection];
-    }, responder);
+    });
   }];
 
   [connection receive:@"setHighlighted" withBlock:^(NSDictionary *params, id<FlipperResponder> responder) {
-    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallSetHighlighted: params[@"id"] withResponder: responder]; }, responder);
+    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallSetHighlighted: params[@"id"] withResponder: responder]; });
   }];
 
   [connection receive:@"setSearchActive" withBlock:^(NSDictionary *params, id<FlipperResponder> responder) {
-    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallSetSearchActive: [params[@"active"] boolValue] withConnection: connection]; }, responder);
+    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallSetSearchActive: [params[@"active"] boolValue] withConnection: connection]; });
   }];
 
   [connection receive:@"isSearchActive" withBlock:^(NSDictionary *params, id<FlipperResponder> responder) {
-    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallIsSearchActiveWithConnection: responder]; }, responder);
+    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallIsSearchActiveWithConnection: responder]; });
   }];
 
   [connection receive:@"isConsoleEnabled" withBlock:^(NSDictionary *params, id<FlipperResponder> responder) {
-    FlipperPerformBlockOnMainThread(^{ [responder success: @{@"isEnabled": @NO}];}, responder);
+    FlipperPerformBlockOnMainThread(^{ [responder success: @{@"isEnabled": @NO}];});
   }];
 
   [connection receive:@"getSearchResults" withBlock:^(NSDictionary *params, id<FlipperResponder> responder) {
-    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallGetSearchResults: params[@"query"] withResponder: responder]; }, responder);
+    FlipperPerformBlockOnMainThread(^{ [weakSelf onCallGetSearchResults: params[@"query"] withResponder: responder]; });
   }];
 }
 
@@ -136,29 +132,6 @@
   const auto rootNode= [self getNode: [self trackObject: _rootNode]];
 
   [responder success: rootNode];
-}
-
-- (void)populateAllNodesFromNode:(nonnull NSString *)identifier inDictionary:(nonnull NSMutableDictionary<NSString*, NSDictionary*> *)mutableDict {
-  NSDictionary *nodeDict = [self getNode:identifier];
-  mutableDict[identifier] = nodeDict;
-  NSArray *arr = nodeDict[@"children"];
-  for (NSString *childIdentifier in arr) {
-    [self populateAllNodesFromNode:childIdentifier inDictionary:mutableDict];
-  }
-  return;
-}
-
-- (void)onCallGetAllNodesWithResponder:(nonnull id<FlipperResponder>)responder {
-  NSMutableArray<NSDictionary*> *allNodes = @[].mutableCopy;
-  NSString *identifier = [self trackObject: _rootNode];
-  NSDictionary *rootNode = [self getNode: identifier];
-  if (!rootNode) {
-    return [responder error:@{@"error": [NSString stringWithFormat:@"getNode returned nil for the rootNode %@, while getting all the nodes", identifier]}];
-  }
-  [allNodes addObject:rootNode];
-  NSMutableDictionary *allNodesDict = @{}.mutableCopy;
-  [self populateAllNodesFromNode:identifier inDictionary:allNodesDict];
-  [responder success:@{@"allNodes": @{@"rootElement": identifier, @"elements": allNodesDict}}];
 }
 
 - (void)onCallGetNodes:(NSArray<NSDictionary *> *)nodeIds withResponder:(id<FlipperResponder>)responder {
@@ -442,10 +415,6 @@
   }
 
   return objectIdentifier;
-}
-
-- (BOOL)runInBackground {
-  return true;
 }
 
 @end

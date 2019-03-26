@@ -1,13 +1,9 @@
 {
-  "name": "Preferences",
+  "name": "flipper-plugin-sharedpreferences",
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
     "lodash": "^4.17.5"
-  },
-  "title": "Shared Preferences Viewer",
-  "bugs": {
-    "email": "halsibai@fb.com"
   }
 }

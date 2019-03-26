@@ -6,7 +6,6 @@
  */
 
 import type {Filter} from 'flipper';
-import type {TableColumns} from '../table/types';
 import {PureComponent} from 'react';
 import Toolbar from '../Toolbar.js';
 import FlexRow from '../FlexRow.js';
@@ -16,7 +15,10 @@ import Text from '../Text.js';
 import FlexBox from '../FlexBox.js';
 import Glyph from '../Glyph.js';
 import FilterToken from './FilterToken.js';
+import PropTypes from 'prop-types';
 import styled from '../../styled/index.js';
+
+const SEARCHABLE_STORAGE_KEY = (key: string) => `SEARCHABLE_STORAGE_KEY_${key}`;
 
 const SearchBar = styled(Toolbar)({
   height: 42,
@@ -89,7 +91,6 @@ type Props = {|
   placeholder?: string,
   actions: React.Node,
   tableKey: string,
-  columns?: TableColumns,
   onFilterChange: (filters: Array<Filter>) => void,
   defaultFilters: Array<Filter>,
 |};
@@ -109,8 +110,12 @@ const Searchable = (
       placeholder: 'Search...',
     };
 
-    state: State = {
-      filters: this.props.defaultFilters || [],
+    static contextTypes = {
+      plugin: PropTypes.string,
+    };
+
+    state = {
+      filters: [],
       focusedToken: -1,
       searchTerm: '',
       hasFocus: false,
@@ -122,26 +127,26 @@ const Searchable = (
       window.document.addEventListener('keydown', this.onKeyDown);
       const {defaultFilters} = this.props;
       let savedState;
-
-      if (this.getTableKey()) {
-        try {
-          savedState = JSON.parse(
-            window.localStorage.getItem(this.getPersistKey()) || 'null',
-          );
-        } catch (e) {
-          window.localStorage.removeItem(this.getPersistKey());
-        }
+      let key = this.context.plugin + this.props.tableKey;
+      try {
+        savedState = JSON.parse(
+          window.localStorage.getItem(SEARCHABLE_STORAGE_KEY(key)) || 'null',
+        );
+      } catch (e) {
+        window.localStorage.removeItem(SEARCHABLE_STORAGE_KEY(key));
       }
-
       if (savedState) {
+        if (this.props.onFilterChange != null) {
+          this.props.onFilterChange(savedState.filters);
+        }
         if (defaultFilters != null) {
-          // merge default filter with persisted filters
           const savedStateFilters = savedState.filters;
           defaultFilters.forEach(defaultFilter => {
             const filterIndex = savedStateFilters.findIndex(
               f => f.key === defaultFilter.key,
             );
             if (filterIndex > -1) {
+              const defaultFilter: Filter = defaultFilters[filterIndex];
               if (defaultFilter.type === 'enum') {
                 savedStateFilters[filterIndex].enum = defaultFilter.enum;
               }
@@ -155,20 +160,21 @@ const Searchable = (
           });
         }
         this.setState({
-          searchTerm: savedState.searchTerm || this.state.searchTerm,
-          filters: savedState.filters || this.state.filters,
+          searchTerm: savedState.searchTerm || '',
+          filters: savedState.filters || [],
         });
       }
     }
 
     componentDidUpdate(prevProps: Props, prevState: State) {
       if (
-        this.getTableKey() &&
+        this.context.plugin &&
         (prevState.searchTerm !== this.state.searchTerm ||
           prevState.filters !== this.state.filters)
       ) {
+        let key = this.context.plugin + this.props.tableKey;
         window.localStorage.setItem(
-          this.getPersistKey(),
+          SEARCHABLE_STORAGE_KEY(key),
           JSON.stringify({
             searchTerm: this.state.searchTerm,
             filters: this.state.filters,
@@ -177,42 +183,12 @@ const Searchable = (
         if (this.props.onFilterChange != null) {
           this.props.onFilterChange(this.state.filters);
         }
-      } else if (prevProps.defaultFilters !== this.props.defaultFilters) {
-        const mergedFilters = [...this.state.filters];
-        this.props.defaultFilters.forEach((defaultFilter: Filter) => {
-          const filterIndex = mergedFilters.findIndex(
-            (f: Filter) => f.key === defaultFilter.key,
-          );
-          if (filterIndex > -1) {
-            mergedFilters[filterIndex] = defaultFilter;
-          } else {
-            mergedFilters.push(defaultFilter);
-          }
-        });
-        this.setState({
-          filters: mergedFilters,
-        });
       }
     }
 
     componentWillUnmount() {
       window.document.removeEventListener('keydown', this.onKeyDown);
     }
-
-    getTableKey = (): ?string => {
-      if (this.props.tableKey) {
-        return this.props.tableKey;
-      } else if (this.props.columns) {
-        // if we have a table, we are using it's colums to uniquely identify
-        // the table (in case there is more than one table rendered at a time)
-        return (
-          'TABLE_COLUMNS_' +
-          Object.keys(this.props.columns)
-            .join('_')
-            .toUpperCase()
-        );
-      }
-    };
 
     onKeyDown = (e: SyntheticKeyboardEvent<>) => {
       const ctrlOrCmd = e =>
@@ -367,8 +343,6 @@ const Searchable = (
         searchTerm: '',
       });
 
-    getPersistKey = () => `SEARCHABLE_STORAGE_KEY_${this.getTableKey() || ''}`;
-
     render(): React.Node {
       const {placeholder, actions, ...props} = this.props;
       return [
@@ -416,8 +390,4 @@ const Searchable = (
     }
   };
 
-/**
- * Higher-order-component that allows adding a searchbar on top of the wrapped
- * component. See SearchableManagedTable for usage with a table.
- */
 export default Searchable;

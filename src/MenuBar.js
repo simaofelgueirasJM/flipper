@@ -5,21 +5,11 @@
  * @format
  */
 
-import type {FlipperPlugin, FlipperDevicePlugin} from './plugin.js';
-import {
-  exportStoreToFile,
-  showOpenDialog,
-  EXPORT_FLIPPER_TRACE_EVENT,
-} from './utils/exportData.js';
-import {setActiveSheet, ACTIVE_SHEET_SHARE_DATA} from './reducers/application';
-import type {Store} from './reducers/';
+import type {FlipperBasePlugin} from './plugin.js';
+
+import plugins from './plugins/index.js';
 import electron from 'electron';
-import {ENABLE_SHAREABLE_LINK} from 'flipper';
-import {remote} from 'electron';
-const {dialog} = remote;
-import os from 'os';
-import path from 'path';
-import {reportPlatformFailures} from './utils/metrics';
+
 export type DefaultKeyboardAction = 'clear' | 'goToBottom' | 'createPaste';
 export type TopLevelMenu = 'Edit' | 'View' | 'Window' | 'Help';
 
@@ -69,31 +59,23 @@ function actionHandler(action: string) {
   if (pluginActionHandler) {
     pluginActionHandler(action);
   } else {
-    console.warn(`Unhandled keyboard action "${action}".`);
+    console.warn(`Unhandled keybaord action "${action}".`);
   }
 }
 
-export function setupMenuBar(
-  plugins: Array<Class<FlipperPlugin<> | FlipperDevicePlugin<>>>,
-  store: Store,
-) {
-  const template = getTemplate(
-    electron.remote.app,
-    electron.remote.shell,
-    store,
-  );
+export function setupMenuBar() {
+  const template = getTemplate(electron.remote.app, electron.remote.shell);
+
   // collect all keyboard actions from all plugins
   const registeredActions: Set<?KeyboardAction> = new Set(
     plugins
-      .map(
-        (plugin: Class<FlipperPlugin<> | FlipperDevicePlugin<>>) =>
-          plugin.keyboardActions || [],
-      )
+      .map((plugin: Class<FlipperBasePlugin<>>) => plugin.keyboardActions || [])
       .reduce((acc: KeyboardActions, cv) => acc.concat(cv), [])
-      .map((action: DefaultKeyboardAction | KeyboardAction) =>
-        typeof action === 'string'
-          ? defaultKeyboardActions.find(a => a.action === action)
-          : action,
+      .map(
+        (action: DefaultKeyboardAction | KeyboardAction) =>
+          typeof action === 'string'
+            ? defaultKeyboardActions.find(a => a.action === action)
+            : action,
       ),
   );
 
@@ -150,9 +132,7 @@ function appendMenuItem(
   }
 }
 
-export function activateMenuItems(
-  activePlugin: FlipperPlugin<> | FlipperDevicePlugin<>,
-) {
+export function activateMenuItems(activePlugin: FlipperBasePlugin<>) {
   // disable all keyboard actions
   for (const item of menuItems) {
     item[1].enabled = false;
@@ -183,59 +163,8 @@ export function activateMenuItems(
   );
 }
 
-function getTemplate(
-  app: Object,
-  shell: Object,
-  store: Store,
-): Array<MenuItem> {
-  const exportSubmenu = [
-    {
-      label: 'File...',
-      accelerator: 'CommandOrControl+E',
-      click: function(item: Object, focusedWindow: Object) {
-        dialog.showSaveDialog(
-          null,
-          {
-            title: 'FlipperExport',
-            defaultPath: path.join(os.homedir(), 'FlipperExport.flipper'),
-          },
-          file => {
-            reportPlatformFailures(
-              exportStoreToFile(file, store),
-              `${EXPORT_FLIPPER_TRACE_EVENT}:UI`,
-            );
-          },
-        );
-      },
-    },
-  ];
-  if (ENABLE_SHAREABLE_LINK) {
-    exportSubmenu.push({
-      label: 'Sharable Link',
-      accelerator: 'CommandOrControl+Shift+E',
-      click: async function(item: Object, focusedWindow: Object) {
-        store.dispatch(setActiveSheet(ACTIVE_SHEET_SHARE_DATA));
-      },
-    });
-  }
-
+function getTemplate(app: Object, shell: Object): Array<MenuItem> {
   const template = [
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'Open File...',
-          accelerator: 'CommandOrControl+O',
-          click: function(item: Object, focusedWindow: Object) {
-            showOpenDialog(store);
-          },
-        },
-        {
-          label: 'Export',
-          submenu: exportSubmenu,
-        },
-      ],
-    },
     {
       label: 'Edit',
       submenu: [

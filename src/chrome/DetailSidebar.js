@@ -7,21 +7,15 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom';
-import Sidebar from '../ui/components/Sidebar';
+import {Sidebar} from 'flipper';
 import {connect} from 'react-redux';
 import {toggleRightSidebarAvailable} from '../reducers/application.js';
 
-type OwnProps = {|
-  children: any,
-  width?: number,
-  minWidth?: number,
-|};
-
 type Props = {
-  ...OwnProps,
+  children: any,
   rightSidebarVisible: boolean,
   rightSidebarAvailable: boolean,
-  toggleRightSidebarAvailable: (visible?: boolean) => any,
+  toggleRightSidebarAvailable: (visible: boolean) => void,
 };
 
 class DetailSidebar extends React.Component<Props> {
@@ -47,10 +41,7 @@ class DetailSidebar extends React.Component<Props> {
       this.props.rightSidebarVisible &&
       domNode &&
       ReactDOM.createPortal(
-        <Sidebar
-          minWidth={this.props.minWidth}
-          width={this.props.width || 300}
-          position="right">
+        <Sidebar width={300} position="right">
           {this.props.children}
         </Sidebar>,
         domNode,
@@ -59,7 +50,7 @@ class DetailSidebar extends React.Component<Props> {
   }
 }
 
-export default connect<Props, OwnProps, _, _, _, _>(
+export default connect(
   ({application: {rightSidebarVisible, rightSidebarAvailable}}) => ({
     rightSidebarVisible,
     rightSidebarAvailable,

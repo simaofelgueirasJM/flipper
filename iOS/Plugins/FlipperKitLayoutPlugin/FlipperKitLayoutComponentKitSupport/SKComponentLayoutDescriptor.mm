@@ -23,7 +23,6 @@
 #import <FlipperKitLayoutPlugin/SKHighlightOverlay.h>
 #import <FlipperKitLayoutPlugin/SKObject.h>
 
-#import "SKSubDescriptor.h"
 #import "SKComponentLayoutWrapper.h"
 #import "CKComponent+Sonar.h"
 #import "Utils.h"
@@ -32,15 +31,10 @@
 {
   NSDictionary<NSNumber *, NSString *> *CKFlexboxAlignSelfEnumMap;
   NSDictionary<NSNumber *, NSString *> *CKFlexboxPositionTypeEnumMap;
-  NSArray<SKSubDescriptor *>*_registeredSubdescriptors;
 }
 
 - (void)setUp {
   [super setUp];
-
-  if (!_registeredSubdescriptors) {
-    _registeredSubdescriptors = [NSArray new];
-  }
 
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
@@ -97,21 +91,10 @@
   if (node.isFlexboxChild) {
     [data addObject: [SKNamed newWithName:@"Layout" withValue:[self propsForFlexboxChild:node.flexboxChild]]];
   }
-  NSMutableDictionary<NSString *, NSObject *> *extraData = [[NSMutableDictionary alloc] init];
-
-  for (SKSubDescriptor *s in _registeredSubdescriptors) {
-    [extraData setObject:[s getDataForNode:node] forKey:[s getName]];
-  }
-  if (extraData.count > 0) {
-    [data addObject: [SKNamed newWithName:@"Extra Sections" withValue:extraData]];
-  }
 
   [data addObjectsFromArray:[node.component sonar_getData]];
-  return data;
-}
 
-- (void)addSubDescriptors:(nonnull NSArray<SKSubDescriptor *>*)subDescriptors{
-  _registeredSubdescriptors = subDescriptors;
+  return data;
 }
 
 - (NSDictionary<NSString *, NSObject *> *)propsForFlexboxChild:(CKFlexboxComponentChild)child {

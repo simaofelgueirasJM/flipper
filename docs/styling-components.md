@@ -20,7 +20,6 @@ const MyView = styled('div')({
 const MyText = styled('span')({ ... });
 const MyImage = styled('img')({ ... });
 const MyInput = styled('input')({ ... });
-```
 
 ## Extending Flipper Components
 

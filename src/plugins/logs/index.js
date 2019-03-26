@@ -44,7 +44,7 @@ type State = {|
   rows: Array<TableBodyRow>,
   entries: Entries,
   key2entry: {[key: string]: DeviceLogEntry},
-  highlightedRows: Set<string>,
+  highlightedRows: Array<string>,
   counters: Array<Counter>,
 |};
 
@@ -243,137 +243,14 @@ function pad(chunk: mixed, len: number): string {
   return str;
 }
 
-export function addEntriesToState(
-  items: Entries,
-  state: $Shape<State> = {
-    rows: [],
-    entries: [],
-    key2entry: {},
-  },
-): $Shape<State> {
-  const rows = [...state.rows];
-  const entries = [...state.entries];
-  const key2entry = {...state.key2entry};
-
-  for (let i = 0; i < items.length; i++) {
-    const {entry, row} = items[i];
-    entries.push({row, entry});
-    key2entry[row.key] = entry;
-
-    let previousEntry: ?DeviceLogEntry = null;
-
-    if (i > 0) {
-      previousEntry = items[i - 1].entry;
-    } else if (state.rows.length > 0 && state.entries.length > 0) {
-      previousEntry = state.entries[state.entries.length - 1].entry;
-    }
-
-    addRowIfNeeded(rows, row, entry, previousEntry);
-  }
-
-  return {
-    entries,
-    rows,
-    key2entry,
-  };
-}
-
-export function addRowIfNeeded(
-  rows: Array<TableBodyRow>,
-  row: TableBodyRow,
-  entry: DeviceLogEntry,
-  previousEntry: ?DeviceLogEntry,
-) {
-  const previousRow = rows.length > 0 ? rows[rows.length - 1] : null;
-  if (
-    previousRow &&
-    previousEntry &&
-    entry.message === previousEntry.message &&
-    entry.tag === previousEntry.tag &&
-    previousRow.type != null
-  ) {
-    // duplicate log, increase counter
-    const count =
-      previousRow.columns.type.value &&
-      previousRow.columns.type.value.props &&
-      typeof previousRow.columns.type.value.props.children === 'number'
-        ? previousRow.columns.type.value.props.children + 1
-        : 2;
-    const type = LOG_TYPES[previousRow.type] || LOG_TYPES.debug;
-    previousRow.columns.type.value = (
-      <LogCount backgroundColor={type.color}>{count}</LogCount>
-    );
-  } else {
-    rows.push(row);
-  }
-}
-
-export function processEntry(
-  entry: DeviceLogEntry,
-  key: string,
-): {
-  row: TableBodyRow,
-  entry: DeviceLogEntry,
-} {
-  const {icon, style} = LOG_TYPES[(entry.type: string)] || LOG_TYPES.debug;
-  // build the item, it will either be batched or added straight away
-  return {
-    entry,
-    row: {
-      columns: {
-        type: {
-          value: icon,
-          align: 'center',
-        },
-        time: {
-          value: (
-            <HiddenScrollText code={true}>
-              {entry.date.toTimeString().split(' ')[0] +
-                '.' +
-                pad(entry.date.getMilliseconds(), 3)}
-            </HiddenScrollText>
-          ),
-        },
-        message: {
-          value: (
-            <HiddenScrollText code={true}>{entry.message}</HiddenScrollText>
-          ),
-        },
-        tag: {
-          value: <HiddenScrollText code={true}>{entry.tag}</HiddenScrollText>,
-          isFilterable: true,
-        },
-        pid: {
-          value: (
-            <HiddenScrollText code={true}>{String(entry.pid)}</HiddenScrollText>
-          ),
-          isFilterable: true,
-        },
-        tid: {
-          value: (
-            <HiddenScrollText code={true}>{String(entry.tid)}</HiddenScrollText>
-          ),
-          isFilterable: true,
-        },
-        app: {
-          value: <HiddenScrollText code={true}>{entry.app}</HiddenScrollText>,
-          isFilterable: true,
-        },
-      },
-      height: getLineCount(entry.message) * 15 + 10, // 15px per line height + 8px padding
-      style,
-      type: entry.type,
-      filterValue: entry.message,
-      key,
-    },
-  };
-}
-
 export default class LogTable extends FlipperDevicePlugin<
   State,
   Actions,
   PersistedState,
 > {
+  static id = 'DeviceLogs';
+  static title = 'Logs';
+  static icon = 'arrow-right';
   static keyboardActions = ['clear', 'goToBottom', 'createPaste'];
 
   initTimer: ?TimeoutID;
@@ -403,27 +280,12 @@ export default class LogTable extends FlipperDevicePlugin<
     }));
   };
 
-  calculateHighlightedRows = (
-    deepLinkPayload: ?string,
-    rows: Array<TableBodyRow>,
-  ): Set<string> => {
-    const highlightedRows = new Set();
-    if (!deepLinkPayload) {
-      return highlightedRows;
-    }
-
-    // Run through array from last to first, because we want to show the last
-    // time it the log we are looking for appeared.
-    for (let i = rows.length - 1; i >= 0; i--) {
-      if (
-        rows[i].filterValue &&
-        rows[i].filterValue.includes(deepLinkPayload)
-      ) {
-        highlightedRows.add(rows[i].key);
-        break;
-      }
-    }
-    return highlightedRows;
+  state = {
+    rows: [],
+    entries: [],
+    key2entry: {},
+    highlightedRows: [],
+    counters: this.restoreSavedCounters(),
   };
 
   tableRef: ?ManagedTable;
@@ -444,32 +306,19 @@ export default class LogTable extends FlipperDevicePlugin<
     this.columnOrder = INITIAL_COLUMN_ORDER.filter(obj =>
       supportedColumns.includes(obj.key),
     );
-
-    const initialState = addEntriesToState(
-      this.device
-        .getLogs()
-        .map(log => processEntry(log, String(this.counter++))),
-    );
-    this.state = {
-      ...initialState,
-      highlightedRows: this.calculateHighlightedRows(
-        props.deepLinkPayload,
-        initialState.rows,
-      ),
-      counters: this.restoreSavedCounters(),
-    };
-
-    this.logListener = this.device.addLogListener((entry: DeviceLogEntry) => {
-      const processedEntry = processEntry(entry, String(this.counter++));
-      this.incrementCounterIfNeeded(processedEntry.entry);
-      this.scheudleEntryForBatch(processedEntry);
-    });
+    this.logListener = this.device.addLogListener(this.processEntry);
   }
 
-  incrementCounterIfNeeded = (entry: DeviceLogEntry) => {
+  processEntry = (entry: DeviceLogEntry) => {
+    const {icon, style} = LOG_TYPES[(entry.type: string)] || LOG_TYPES.debug;
+
+    // clean message
+    const message = entry.message.trim();
+    entry.type === 'error';
+
     let counterUpdated = false;
     const counters = this.state.counters.map(counter => {
-      if (entry.message.match(counter.expression)) {
+      if (message.match(counter.expression)) {
         counterUpdated = true;
         if (counter.notify) {
           new window.Notification(`${counter.label}`, {
@@ -487,12 +336,61 @@ export default class LogTable extends FlipperDevicePlugin<
     if (counterUpdated) {
       this.setState({counters});
     }
-  };
 
-  scheudleEntryForBatch = (item: {
-    row: TableBodyRow,
-    entry: DeviceLogEntry,
-  }) => {
+    // build the item, it will either be batched or added straight away
+    const item = {
+      entry,
+      row: {
+        columns: {
+          type: {
+            value: icon,
+            align: 'center',
+          },
+          time: {
+            value: (
+              <HiddenScrollText code={true}>
+                {entry.date.toTimeString().split(' ')[0] +
+                  '.' +
+                  pad(entry.date.getMilliseconds(), 3)}
+              </HiddenScrollText>
+            ),
+          },
+          message: {
+            value: <HiddenScrollText code={true}>{message}</HiddenScrollText>,
+          },
+          tag: {
+            value: <HiddenScrollText code={true}>{entry.tag}</HiddenScrollText>,
+            isFilterable: true,
+          },
+          pid: {
+            value: (
+              <HiddenScrollText code={true}>
+                {String(entry.pid)}
+              </HiddenScrollText>
+            ),
+            isFilterable: true,
+          },
+          tid: {
+            value: (
+              <HiddenScrollText code={true}>
+                {String(entry.tid)}
+              </HiddenScrollText>
+            ),
+            isFilterable: true,
+          },
+          app: {
+            value: <HiddenScrollText code={true}>{entry.app}</HiddenScrollText>,
+            isFilterable: true,
+          },
+        },
+        height: getLineCount(message) * 15 + 10, // 15px per line height + 8px padding
+        style,
+        type: entry.type,
+        filterValue: entry.message,
+        key: String(this.counter++),
+      },
+    };
+
     // batch up logs to be processed every 250ms, if we have lots of log
     // messages coming in, then calling an setState 200+ times is actually
     // pretty expensive
@@ -505,7 +403,35 @@ export default class LogTable extends FlipperDevicePlugin<
         const thisBatch = this.batch;
         this.batch = [];
         this.queued = false;
-        this.setState(state => addEntriesToState(thisBatch, state));
+
+        // update rows/entries
+        this.setState(state => {
+          const rows = [...state.rows];
+          const entries = [...state.entries];
+          const key2entry = {...state.key2entry};
+
+          for (let i = 0; i < thisBatch.length; i++) {
+            const {entry, row} = thisBatch[i];
+            entries.push({row, entry});
+            key2entry[row.key] = entry;
+
+            let previousEntry: ?DeviceLogEntry = null;
+
+            if (i > 0) {
+              previousEntry = thisBatch[i - 1].entry;
+            } else if (state.rows.length > 0 && state.entries.length > 0) {
+              previousEntry = state.entries[state.entries.length - 1].entry;
+            }
+
+            this.addRowIfNeeded(rows, row, entry, previousEntry);
+          }
+
+          return {
+            entries,
+            rows,
+            key2entry,
+          };
+        });
       }, 100);
     }
   };
@@ -520,14 +446,41 @@ export default class LogTable extends FlipperDevicePlugin<
     }
   }
 
+  addRowIfNeeded(
+    rows: Array<TableBodyRow>,
+    row: TableBodyRow,
+    entry: DeviceLogEntry,
+    previousEntry: ?DeviceLogEntry,
+  ) {
+    const previousRow = rows.length > 0 ? rows[rows.length - 1] : null;
+    if (
+      previousRow &&
+      previousEntry &&
+      entry.message === previousEntry.message &&
+      entry.tag === previousEntry.tag &&
+      previousRow.type != null
+    ) {
+      // duplicate log, increase counter
+      const count =
+        previousRow.columns.type.value &&
+        previousRow.columns.type.value.props &&
+        typeof previousRow.columns.type.value.props.children === 'number'
+          ? previousRow.columns.type.value.props.children + 1
+          : 2;
+      const type = LOG_TYPES[previousRow.type] || LOG_TYPES.debug;
+      previousRow.columns.type.value = (
+        <LogCount backgroundColor={type.color}>{count}</LogCount>
+      );
+    } else {
+      rows.push(row);
+    }
+  }
+
   clearLogs = () => {
-    this.device.clearLogs().catch(e => {
-      console.error('Failed to clear logs: ', e);
-    });
     this.setState({
       entries: [],
       rows: [],
-      highlightedRows: new Set(),
+      highlightedRows: [],
       key2entry: {},
       counters: this.state.counters.map(counter => ({
         ...counter,
@@ -543,10 +496,10 @@ export default class LogTable extends FlipperDevicePlugin<
         .map(key => textContent(row.columns[key].value))
         .join('\t');
 
-    if (this.state.highlightedRows.size > 0) {
+    if (this.state.highlightedRows.length > 0) {
       // create paste from selection
       paste = this.state.rows
-        .filter(row => this.state.highlightedRows.has(row.key))
+        .filter(row => this.state.highlightedRows.indexOf(row.key) > -1)
         .map(mapFn)
         .join('\n');
     } else {
@@ -569,7 +522,7 @@ export default class LogTable extends FlipperDevicePlugin<
   onRowHighlighted = (highlightedRows: Array<string>) => {
     this.setState({
       ...this.state,
-      highlightedRows: new Set(highlightedRows),
+      highlightedRows,
     });
   };
 
@@ -593,21 +546,20 @@ export default class LogTable extends FlipperDevicePlugin<
     flex: 1,
   });
 
-  buildContextMenuItems = () => [
-    {
-      type: 'separator',
-    },
-    {
-      label: 'Clear all',
-      click: this.clearLogs,
-    },
-  ];
-
   render() {
+    const {rows} = this.state;
+
+    const contextMenuItems = [
+      {
+        type: 'separator',
+      },
+      {
+        label: 'Clear all',
+        click: this.clearLogs,
+      },
+    ];
     return (
-      <LogTable.ContextMenu
-        buildItems={this.buildContextMenuItems}
-        component={FlexColumn}>
+      <LogTable.ContextMenu items={contextMenuItems} component={FlexColumn}>
         <SearchableTable
           innerRef={this.setTableRef}
           floating={false}
@@ -615,17 +567,13 @@ export default class LogTable extends FlipperDevicePlugin<
           columnSizes={this.columnSizes}
           columnOrder={this.columnOrder}
           columns={this.columns}
-          rows={this.state.rows}
-          highlightedRows={this.state.highlightedRows}
+          rows={rows}
           onRowHighlighted={this.onRowHighlighted}
           multiHighlight={true}
           defaultFilters={DEFAULT_FILTERS}
           zebra={false}
           actions={<Button onClick={this.clearLogs}>Clear Logs</Button>}
-          // If the logs is opened through deeplink, then don't scroll as the row is highlighted
-          stickyBottom={
-            !(this.props.deepLinkPayload && this.state.highlightedRows.size > 0)
-          }
+          stickyBottom={true}
         />
         <DetailSidebar>{this.renderSidebar()}</DetailSidebar>
       </LogTable.ContextMenu>

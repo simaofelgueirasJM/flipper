@@ -6,7 +6,7 @@
  */
 
 import type {SecureServerConfig} from './utils/CertificateProvider';
-import type {Logger} from './fb-interfaces/Logger';
+import type Logger from './fb-stubs/Logger';
 import type {ClientQuery} from './Client.js';
 import type {Store} from './reducers/index.js';
 
@@ -15,13 +15,15 @@ import {RSocketServer, ReactiveSocket} from 'rsocket-core';
 import RSocketTCPServer from 'rsocket-tcp-server';
 import {Single} from 'rsocket-flowable';
 import Client from './Client.js';
-import type {UninitializedClient} from './UninitializedClient';
-import {reportPlatformFailures} from './utils/metrics';
+import {RecurringError} from './utils/errors';
 
 const EventEmitter = (require('events'): any);
 const invariant = require('invariant');
 const tls = require('tls');
 const net = require('net');
+
+export const SECURE_PORT = 8088;
+export const INSECURE_PORT = 8089;
 
 type RSocket = {|
   fireAndForget(payload: {data: string}): void,
@@ -36,8 +38,8 @@ type ClientInfo = {|
 
 export default class Server extends EventEmitter {
   connections: Map<string, ClientInfo>;
-  secureServer: Promise<RSocketServer>;
-  insecureServer: Promise<RSocketServer>;
+  secureServer: RSocketServer;
+  insecureServer: RSocketServer;
   certificateProvider: CertificateProvider;
   connectionTracker: ConnectionTracker;
   logger: Logger;
@@ -58,61 +60,54 @@ export default class Server extends EventEmitter {
     ((event: 'clients-change', callback: () => void) => void);
 
   init() {
-    const {insecure, secure} = this.store.getState().application.serverPorts;
     this.initialisePromise = this.certificateProvider
       .loadSecureServerConfig()
-      .then(options => (this.secureServer = this.startServer(secure, options)))
+      .then(
+        options => (this.secureServer = this.startServer(SECURE_PORT, options)),
+      )
       .then(() => {
-        this.insecureServer = this.startServer(insecure);
+        this.insecureServer = this.startServer(INSECURE_PORT);
         return;
       });
-    reportPlatformFailures(this.initialisePromise, 'initializeServer');
     return this.initialisePromise;
   }
 
-  startServer(
-    port: number,
-    sslConfig?: SecureServerConfig,
-  ): Promise<RSocketServer> {
+  startServer(port: number, sslConfig?: SecureServerConfig) {
     const server = this;
-    return new Promise((resolve, reject) => {
-      let rsServer;
-      const serverFactory = onConnect => {
-        const transportServer = sslConfig
-          ? tls.createServer(sslConfig, socket => {
-              onConnect(socket);
-            })
-          : net.createServer(onConnect);
-        transportServer
-          .on('error', err => {
-            server.emit('error', err);
-            console.error(`Error opening server on port ${port}`, 'server');
-            reject(err);
+    const serverFactory = onConnect => {
+      const transportServer = sslConfig
+        ? tls.createServer(sslConfig, socket => {
+            onConnect(socket);
           })
-          .on('listening', () => {
-            console.debug(
-              `${
-                sslConfig ? 'Secure' : 'Certificate'
-              } server started on port ${port}`,
-              'server',
-            );
-            server.emit('listening', port);
-            resolve(rsServer);
-          });
-        return transportServer;
-      };
-
-      rsServer = new RSocketServer({
-        getRequestHandler: sslConfig
-          ? this._trustedRequestHandler
-          : this._untrustedRequestHandler,
-        transport: new RSocketTCPServer({
-          port: port,
-          serverFactory: serverFactory,
-        }),
-      });
-      rsServer.start();
+        : net.createServer(onConnect);
+      transportServer
+        .on('error', err => {
+          server.emit('error', err);
+          console.error(`Error opening server on port ${port}`, 'server');
+        })
+        .on('listening', () => {
+          console.debug(
+            `${
+              sslConfig ? 'Secure' : 'Certificate'
+            } server started on port ${port}`,
+            'server',
+          );
+          server.emit('listening', port);
+        });
+      return transportServer;
+    };
+    const rsServer = new RSocketServer({
+      getRequestHandler: sslConfig
+        ? this._trustedRequestHandler
+        : this._untrustedRequestHandler,
+      transport: new RSocketTCPServer({
+        port: port,
+        serverFactory: serverFactory,
+      }),
     });
+
+    rsServer.start();
+    return rsServer;
   }
 
   _trustedRequestHandler = (conn: RSocket, connectRequest: {data: string}) => {
@@ -145,12 +140,21 @@ export default class Server extends EventEmitter {
     const clientData = JSON.parse(connectRequest.data);
     this.connectionTracker.logConnectionAttempt(clientData);
 
-    const client: UninitializedClient = {
-      os: clientData.os,
-      deviceName: clientData.device,
-      appName: clientData.app,
-    };
-    this.emit('start-client-setup', client);
+    if (
+      clientData.os === 'iOS' &&
+      !clientData.device.toLowerCase().includes('simulator')
+    ) {
+      this.emit(
+        'error',
+        new Error(
+          "Flipper doesn't currently support physical iOS devices. You can still use it to view logs, but for now to use the majority of the Flipper plugins you'll have to use the Simulator.",
+        ),
+      );
+      console.warn(
+        'Physical iOS device detected. This is not currently supported by Flipper.',
+        'server',
+      );
+    }
 
     return {
       requestResponse: (payload: {data: string}) => {
@@ -177,18 +181,11 @@ export default class Server extends EventEmitter {
         |} = rawData;
         if (json.method === 'signCertificate') {
           console.debug('CSR received from device', 'server');
-
           const {csr, destination} = json;
           return new Single(subscriber => {
             subscriber.onSubscribe();
-            reportPlatformFailures(
-              this.certificateProvider.processCertificateSigningRequest(
-                csr,
-                clientData.os,
-                destination,
-              ),
-              'processCertificateSigningRequest',
-            )
+            this.certificateProvider
+              .processCertificateSigningRequest(csr, clientData.os, destination)
               .then(result => {
                 subscriber.onComplete({
                   data: JSON.stringify({
@@ -196,14 +193,10 @@ export default class Server extends EventEmitter {
                   }),
                   metadata: '',
                 });
-                this.emit('finish-client-setup', {
-                  client,
-                  deviceId: result.deviceId,
-                });
               })
               .catch(e => {
+                console.error(e, 'server');
                 subscriber.onError(e);
-                this.emit('client-setup-error', {client, error: e});
               });
           });
         }
@@ -246,10 +239,8 @@ export default class Server extends EventEmitter {
   close(): Promise<void> {
     if (this.initialisePromise) {
       return this.initialisePromise.then(_ => {
-        return Promise.all([
-          this.secureServer.then(server => server.stop()),
-          this.insecureServer.then(server => server.stop()),
-        ]).then(() => undefined);
+        this.secureServer.stop();
+        this.insecureServer.stop();
       });
     }
     return Promise.resolve();
@@ -262,7 +253,7 @@ export default class Server extends EventEmitter {
   addConnection(conn: ReactiveSocket, query: ClientQuery): Client {
     invariant(query, 'expected query');
 
-    const id = `${query.app}#${query.os}#${query.device}#${query.device_id}`;
+    const id = `${query.app}-${query.os}-${query.device}-${query.device_id}`;
     console.debug(`Device connected: ${id}`, 'server');
 
     const client = new Client(id, query, conn, this.logger, this.store);
@@ -283,7 +274,7 @@ export default class Server extends EventEmitter {
       /* If a device gets disconnected without being cleaned up properly,
        * Flipper won't be aware until it attempts to reconnect.
        * When it does we need to terminate the zombie connection.
-       */
+      */
       if (this.connections.has(id)) {
         const connectionInfo = this.connections.get(id);
         connectionInfo &&
@@ -341,9 +332,11 @@ class ConnectionTracker {
     this.connectionAttempts.set(key, entry);
     if (entry.length >= this.connectionProblemThreshold) {
       console.error(
-        `Connection loop detected with ${key}. Connected ${
-          this.connectionProblemThreshold
-        } times within ${this.timeWindowMillis / 1000}s.`,
+        new RecurringError(
+          `Connection loop detected with ${key}. Connected ${
+            this.connectionProblemThreshold
+          } times within ${this.timeWindowMillis / 1000}s.`,
+        ),
         'server',
       );
     }

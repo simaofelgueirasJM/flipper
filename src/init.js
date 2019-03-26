@@ -10,16 +10,15 @@ import ReactDOM from 'react-dom';
 import {ContextMenuProvider} from 'flipper';
 import {precachedIcons} from './utils/icons.js';
 import GK from './fb-stubs/GK.js';
-import {init as initLogger} from './fb-stubs/Logger';
+import Logger from './fb-stubs/Logger.js';
 import App from './App.js';
 import BugReporter from './fb-stubs/BugReporter.js';
 import {createStore} from 'redux';
 import {persistStore} from 'redux-persist';
 import reducers from './reducers/index.js';
 import dispatcher from './dispatcher/index.js';
+import {setupMenuBar} from './MenuBar.js';
 import TooltipProvider from './ui/components/TooltipProvider.js';
-import config from './utils/processConfig.js';
-import {initLauncherHooks} from './utils/launcher.js';
 const path = require('path');
 
 const store = createStore(
@@ -28,10 +27,11 @@ const store = createStore(
 );
 persistStore(store);
 
-const logger = initLogger(store);
-const bugReporter = new BugReporter(logger, store);
+const logger = new Logger();
+const bugReporter = new BugReporter(logger);
 dispatcher(store, logger);
 GK.init();
+setupMenuBar();
 
 const AppFrame = () => (
   <TooltipProvider>
@@ -57,8 +57,6 @@ function init() {
       (r.installing || r.active).postMessage({precachedIcons});
     })
     .catch(console.error);
-
-  initLauncherHooks(config(), store);
 }
 
 // make init function callable from outside

@@ -9,20 +9,23 @@ import {Button, ButtonGroup, Component} from 'flipper';
 import {connect} from 'react-redux';
 import AndroidDevice from '../devices/AndroidDevice';
 import IOSDevice from '../devices/IOSDevice';
-import expandTilde from 'expand-tilde';
-import fs from 'fs';
 import os from 'os';
+import fs from 'fs';
 import adb from 'adbkit-fb';
-import {exec, spawn} from 'child_process';
+import {exec} from 'child_process';
 import {remote} from 'electron';
 import path from 'path';
-import {reportPlatformFailures} from '../utils/metrics';
-import config from '../utils/processConfig';
-import type BaseDevice from '../devices/BaseDevice';
 
-const CAPTURE_LOCATION = expandTilde(
-  config().screenCapturePath || remote.app.getPath('desktop'),
-);
+let CAPTURE_LOCATION = remote.app.getPath('desktop');
+try {
+  CAPTURE_LOCATION =
+    JSON.parse(window.process.env.CONFIG).screenCapturePath.replace(
+      /^~/,
+      os.homedir(),
+    ) || CAPTURE_LOCATION;
+} catch (e) {}
+
+import type BaseDevice from '../devices/BaseDevice';
 
 type PullTransfer = any;
 
@@ -37,12 +40,15 @@ type State = {|
   capturingScreenshot: boolean,
 |};
 
-function openFile(path: string) {
-  const child = spawn(getOpenCommand(), [path]);
-  child.on('exit', (code, signal) => {
-    if (code != 0) {
-      console.error(`${getOpenCommand()} failed with exit code ${code}`);
-    }
+function openFile(path: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    exec(`${getOpenCommand()} "${path}"`, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(path);
+      }
+    });
   });
 }
 
@@ -118,35 +124,29 @@ class ScreenCaptureButtons extends Component<Props, State> {
     }
   };
 
-  captureScreenshot = (): ?Promise<void> => {
+  captureScreenshot = (): ?Promise<string> => {
     const {selectedDevice} = this.props;
 
     if (selectedDevice instanceof AndroidDevice) {
-      return reportPlatformFailures(
-        selectedDevice.adb
-          .screencap(selectedDevice.serial)
-          .then(writePngStreamToFile)
-          .then(openFile),
-        'captureScreenshotAndroid',
-      ).catch(console.error);
+      return selectedDevice.adb
+        .screencap(selectedDevice.serial)
+        .then(writePngStreamToFile)
+        .then(openFile)
+        .catch(console.error);
     } else if (selectedDevice instanceof IOSDevice) {
       const screenshotPath = path.join(CAPTURE_LOCATION, getFileName('png'));
-      return reportPlatformFailures(
-        new Promise((resolve, reject) => {
-          exec(
-            `xcrun simctl io booted screenshot "${screenshotPath}"`,
-            async (err, data) => {
-              if (err) {
-                reject(err);
-              } else {
-                openFile(screenshotPath);
-                resolve();
-              }
-            },
-          );
-        }),
-        'captureScreenshotIos',
-      );
+      return new Promise((resolve, reject) => {
+        exec(
+          `xcrun simctl io booted screenshot "${screenshotPath}"`,
+          async (err, data) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(await openFile(screenshotPath));
+            }
+          },
+        );
+      });
     }
   };
 
@@ -155,27 +155,13 @@ class ScreenCaptureButtons extends Component<Props, State> {
     const videoPath = path.join(CAPTURE_LOCATION, getFileName('mp4'));
     this.videoPath = videoPath;
     if (selectedDevice instanceof AndroidDevice) {
-      const devicePath = '/sdcard/flipper_recorder';
-
       this.setState({
         recording: true,
       });
-
       this.executeShell(
         selectedDevice,
-        `mkdir -p "${devicePath}" && echo -n > "${devicePath}/.nomedia"`,
+        `screenrecord --bugreport /sdcard/video.mp4`,
       )
-        .then(output => {
-          if (output) {
-            throw output;
-          }
-        })
-        .then(() =>
-          this.executeShell(
-            selectedDevice,
-            `screenrecord --bugreport "${devicePath}/video.mp4"`,
-          ),
-        )
         .then(output => {
           if (output) {
             throw output;
@@ -188,19 +174,17 @@ class ScreenCaptureButtons extends Component<Props, State> {
           });
         })
         .then(
-          (): Promise<string> =>
-            this.pullFromDevice(
+          (): Promise<string> => {
+            return this.pullFromDevice(
               selectedDevice,
-              `${devicePath}/video.mp4`,
+              `/sdcard/video.mp4`,
               videoPath,
-            ),
+            );
+          },
         )
         .then(openFile)
-        .then(() => this.executeShell(selectedDevice, `rm -rf "${devicePath}"`))
-        .then(output => {
-          if (output) {
-            throw output;
-          }
+        .then(() => {
+          this.executeShell(selectedDevice, `rm /sdcard/video.mp4`);
         })
         .then(() => {
           this.setState({
@@ -298,8 +282,6 @@ class ScreenCaptureButtons extends Component<Props, State> {
   }
 }
 
-export default connect<Props, {||}, _, _, _, _>(
-  ({connections: {selectedDevice}}) => ({
-    selectedDevice,
-  }),
-)(ScreenCaptureButtons);
+export default connect(({connections: {selectedDevice}}) => ({
+  selectedDevice,
+}))(ScreenCaptureButtons);

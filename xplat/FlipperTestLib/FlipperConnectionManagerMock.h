@@ -1,9 +1,11 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
+/*
+ *  Copyright (c) 2018-present, Facebook, Inc.
  *
- * This source code is licensed under the MIT license found in the LICENSE
- * file in the root directory of this source tree.
+ *  This source code is licensed under the MIT license found in the LICENSE
+ *  file in the root directory of this source tree.
+ *
  */
+
 #pragma once
 
 #include <Flipper/FlipperConnectionManager.h>
@@ -38,16 +40,6 @@ class FlipperConnectionManagerMock : public FlipperConnectionManager {
     messages.push_back(message);
   }
 
-  void onMessageReceived(
-      const folly::dynamic& message,
-      std::unique_ptr<FlipperResponder> responder) override {
-    if (responder) {
-      respondersReceived++;
-    }
-    callbacks->onMessageReceived(message, std::move(responder));
-    messagesReceived.push_back(message);
-  }
-
   void setCallbacks(Callbacks* aCallbacks) override {
     callbacks = aCallbacks;
   }
@@ -56,8 +48,6 @@ class FlipperConnectionManagerMock : public FlipperConnectionManager {
   bool open = false;
   Callbacks* callbacks;
   std::vector<folly::dynamic> messages;
-  std::vector<folly::dynamic> messagesReceived;
-  int respondersReceived = 0;
 };
 
 } // namespace test

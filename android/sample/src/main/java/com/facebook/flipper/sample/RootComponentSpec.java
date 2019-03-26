@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) Facebook, Inc.
+ *  Copyright (c) 2004-present, Facebook, Inc.
  *
  *  This source code is licensed under the MIT license found in the LICENSE
  *  file in the root directory of this source tree.
@@ -8,29 +8,33 @@
 package com.facebook.flipper.sample;
 
 import android.content.Intent;
-import com.facebook.drawee.backends.pipeline.Fresco;
-import com.facebook.drawee.interfaces.DraweeController;
+import android.util.Log;
+import com.facebook.flipper.android.AndroidFlipperClient;
 import com.facebook.flipper.android.diagnostics.FlipperDiagnosticActivity;
+import com.facebook.flipper.core.FlipperClient;
+import com.facebook.flipper.core.FlipperPlugin;
+import com.facebook.flipper.plugins.example.ExampleFlipperPlugin;
 import com.facebook.litho.ClickEvent;
 import com.facebook.litho.Column;
 import com.facebook.litho.Component;
 import com.facebook.litho.ComponentContext;
-import com.facebook.litho.StateValue;
 import com.facebook.litho.annotations.LayoutSpec;
 import com.facebook.litho.annotations.OnCreateLayout;
 import com.facebook.litho.annotations.OnEvent;
-import com.facebook.litho.annotations.OnUpdateState;
-import com.facebook.litho.annotations.State;
-import com.facebook.litho.fresco.FrescoImage;
 import com.facebook.litho.widget.Text;
+import java.io.IOException;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.FormBody;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 @LayoutSpec
 public class RootComponentSpec {
 
   @OnCreateLayout
-  static Component onCreateLayout(final ComponentContext c, @State boolean displayImage) {
-    final DraweeController controller =
-        Fresco.newDraweeControllerBuilder().setUri("https://fbflipper.com/img/icon.png").build();
+  static Component onCreateLayout(final ComponentContext c) {
     return Column.create(c)
         .child(
             Text.create(c)
@@ -53,47 +57,86 @@ public class RootComponentSpec {
         .child(
             Text.create(c)
                 .text("Diagnose connection issues")
-                .key("4")
+                .key("3")
                 .textSizeSp(20)
                 .clickHandler(RootComponent.openDiagnostics(c)))
-        .child(
-            Text.create(c)
-                .text("Load Fresco image")
-                .key("5")
-                .textSizeSp(20)
-                .clickHandler(RootComponent.loadImage(c)))
-        .child(displayImage ? FrescoImage.create(c).controller(controller) : null)
         .build();
   }
 
   @OnEvent(ClickEvent.class)
   static void hitGetRequest(final ComponentContext c) {
-    ExampleActions.sendGetRequest();
+
+    final Request request =
+        new Request.Builder().url("https://api.github.com/repos/facebook/yoga").get().build();
+    FlipperSampleApplication.sOkHttpClient
+        .newCall(request)
+        .enqueue(
+            new Callback() {
+              @Override
+              public void onFailure(final Call call, final IOException e) {
+                e.printStackTrace();
+                Log.d("Flipper", e.getMessage());
+              }
+
+              @Override
+              public void onResponse(final Call call, final Response response) throws IOException {
+                if (response.isSuccessful()) {
+                  Log.d("Flipper", response.body().string());
+                } else {
+                  Log.d("Flipper", "not successful");
+                }
+              }
+            });
   }
 
   @OnEvent(ClickEvent.class)
   static void hitPostRequest(final ComponentContext c) {
-    ExampleActions.sendPostRequest();
+
+    final RequestBody formBody =
+        new FormBody.Builder().add("app", "Flipper").add("remarks", "Its awesome").build();
+
+    final Request request =
+        new Request.Builder()
+            .url("https://demo9512366.mockable.io/SonarPost")
+            .post(formBody)
+            .build();
+
+    FlipperSampleApplication.sOkHttpClient
+        .newCall(request)
+        .enqueue(
+            new Callback() {
+              @Override
+              public void onFailure(final Call call, final IOException e) {
+                e.printStackTrace();
+                Log.d("Flipper", e.getMessage());
+              }
+
+              @Override
+              public void onResponse(final Call call, final Response response) throws IOException {
+                if (response.isSuccessful()) {
+                  Log.d("Flipper", response.body().string());
+                } else {
+                  Log.d("Flipper", "not successful");
+                }
+              }
+            });
   }
 
   @OnEvent(ClickEvent.class)
   static void triggerNotification(final ComponentContext c) {
-    ExampleActions.sendNotification();
+    FlipperClient client = AndroidFlipperClient.getInstanceIfInitialized();
+    if (client != null) {
+      FlipperPlugin plugin = client.getPlugin(ExampleFlipperPlugin.ID);
+      if (plugin instanceof ExampleFlipperPlugin) {
+        ((ExampleFlipperPlugin) plugin).triggerNotification();
+      }
+    }
   }
 
   @OnEvent(ClickEvent.class)
   static void openDiagnostics(final ComponentContext c) {
-    Intent intent = new Intent(c.getAndroidContext(), FlipperDiagnosticActivity.class);
-    c.getAndroidContext().startActivity(intent);
+    Intent intent = new Intent(c, FlipperDiagnosticActivity.class);
+    c.startActivity(intent);
   }
 
-  @OnUpdateState
-  static void updateDisplayImage(StateValue<Boolean> displayImage) {
-    displayImage.set(true);
-  }
-
-  @OnEvent(ClickEvent.class)
-  static void loadImage(final ComponentContext c) {
-    RootComponent.updateDisplayImageAsync(c);
-  }
 }

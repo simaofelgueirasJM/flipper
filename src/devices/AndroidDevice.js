@@ -9,8 +9,8 @@ import type {DeviceType, DeviceShell} from './BaseDevice.js';
 
 import {Priority} from 'adbkit-logcat-fb';
 import child_process from 'child_process';
-import child_process_promise from 'child-process-es6-promise';
 import BaseDevice from './BaseDevice.js';
+import {SECURE_PORT, INSECURE_PORT} from '../server';
 
 type ADBClient = any;
 
@@ -26,34 +26,36 @@ export default class AndroidDevice extends BaseDevice {
 
     this.adb.openLogcat(this.serial).then(reader => {
       reader.on('entry', entry => {
-        let type = 'unknown';
-        if (entry.priority === Priority.VERBOSE) {
-          type = 'verbose';
-        }
-        if (entry.priority === Priority.DEBUG) {
-          type = 'debug';
-        }
-        if (entry.priority === Priority.INFO) {
-          type = 'info';
-        }
-        if (entry.priority === Priority.WARN) {
-          type = 'warn';
-        }
-        if (entry.priority === Priority.ERROR) {
-          type = 'error';
-        }
-        if (entry.priority === Priority.FATAL) {
-          type = 'fatal';
-        }
+        if (this.logListeners.size > 0) {
+          let type = 'unknown';
+          if (entry.priority === Priority.VERBOSE) {
+            type = 'verbose';
+          }
+          if (entry.priority === Priority.DEBUG) {
+            type = 'debug';
+          }
+          if (entry.priority === Priority.INFO) {
+            type = 'info';
+          }
+          if (entry.priority === Priority.WARN) {
+            type = 'warn';
+          }
+          if (entry.priority === Priority.ERROR) {
+            type = 'error';
+          }
+          if (entry.priority === Priority.FATAL) {
+            type = 'fatal';
+          }
 
-        this.addLogEntry({
-          tag: entry.tag,
-          pid: entry.pid,
-          tid: entry.tid,
-          message: entry.message,
-          date: entry.date,
-          type,
-        });
+          this.notifyLogListeners({
+            tag: entry.tag,
+            pid: entry.pid,
+            tid: entry.tid,
+            message: entry.message,
+            date: entry.date,
+            type,
+          });
+        }
       });
     });
   }
@@ -68,21 +70,19 @@ export default class AndroidDevice extends BaseDevice {
     return ['date', 'pid', 'tid', 'tag', 'message', 'type', 'time'];
   }
 
-  reverse(ports: [number, number]): Promise<void> {
-    return Promise.all(
-      ports.map(port =>
-        this.adb.reverse(this.serial, `tcp:${port}`, `tcp:${port}`),
-      ),
-    ).then(() => {
-      return;
-    });
+  reverse(): Promise<void> {
+    return this.adb
+      .reverse(this.serial, `tcp:${SECURE_PORT}`, `tcp:${SECURE_PORT}`)
+      .then(() =>
+        this.adb.reverse(
+          this.serial,
+          `tcp:${INSECURE_PORT}`,
+          `tcp:${INSECURE_PORT}`,
+        ),
+      );
   }
 
-  spawnShell(): ?DeviceShell {
+  spawnShell(): DeviceShell {
     return child_process.spawn('adb', ['-s', this.serial, 'shell', '-t', '-t']);
-  }
-
-  clearLogs(): Promise<void> {
-    return child_process_promise.spawn('adb', ['logcat', '-c']);
   }
 }

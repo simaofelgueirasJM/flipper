@@ -10,7 +10,7 @@ package com.facebook.flipper.plugins.inspector.descriptors.utils;
 
 import static com.facebook.flipper.plugins.inspector.InspectorValue.Type.Enum;
 
-import androidx.collection.SimpleArrayMap;
+import android.support.v4.util.SimpleArrayMap;
 import com.facebook.flipper.plugins.inspector.InspectorValue;
 
 public class EnumMapping {

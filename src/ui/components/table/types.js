@@ -11,7 +11,7 @@ export const MINIMUM_COLUMN_WIDTH = 100;
 export const DEFAULT_COLUMN_WIDTH = 200;
 export const DEFAULT_ROW_HEIGHT = 23;
 
-export type TableColumnOrderVal = {
+type TableColumnOrderVal = {
   key: string,
   visible: boolean,
 };

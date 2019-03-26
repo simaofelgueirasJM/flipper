@@ -41,21 +41,21 @@
     [[self sharedInstance] swizzleSelector:selector class:aClass block:block];
 }
 
-- (void)swizzleSelector:(SEL)selector class:(Class)aClass block:(void (^)(NSInvocation * _Nonnull))blk {
+- (void)swizzleSelector:(SEL)selector class:(Class)aClass block:(void (^)(NSInvocation * _Nonnull))block {
     if (![self.swizzledClasses containsObject:aClass]) {
         SEL fwdSel = @selector(forwardInvocation:);
         Method m = class_getInstanceMethod(aClass, fwdSel);
         __block IMP orig;
         __weak typeof(self) weakSelf = self;
-        IMP imp = imp_implementationWithBlock(^(id this, NSInvocation *invocation) {
+        IMP imp = imp_implementationWithBlock(^(id self, NSInvocation *invocation) {
             NSString * selStr = NSStringFromSelector([invocation selector]);
             void (^block)(NSInvocation *) = weakSelf.swizzledBlocks[aClass][selStr];
-            if (blk != nil) {
+            if (block != nil) {
                 NSString *originalStr = [@"comfacebookFlipperKit_" stringByAppendingString:selStr];
                 [invocation setSelector:NSSelectorFromString(originalStr)];
                 block(invocation);
             } else {
-                ((void (*)(id, SEL, NSInvocation *))orig)(this, fwdSel, invocation);
+                ((void (*)(id, SEL, NSInvocation *))orig)(self, fwdSel, invocation);
             }
         });
         orig = method_setImplementation(m, imp);
@@ -66,7 +66,7 @@
         classDict = [NSMutableDictionary dictionary];
         self.swizzledBlocks[(id)aClass] = classDict;
     }
-    classDict[NSStringFromSelector(selector)] = blk;
+    classDict[NSStringFromSelector(selector)] = block;
     Method m = class_getInstanceMethod(aClass, selector);
     NSString *newSelStr = [@"comfacebookFlipperKit_" stringByAppendingString:NSStringFromSelector(selector)];
     SEL newSel = NSSelectorFromString(newSelStr);

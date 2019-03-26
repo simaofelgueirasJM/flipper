@@ -7,27 +7,12 @@
  */
 #import <Foundation/Foundation.h>
 #import "FlipperPlugin.h"
-#import "FlipperResponder.h"
 
-void FlipperPerformBlockOnMainThread(void(^block)(), id<FlipperResponder> responder)
+void FlipperPerformBlockOnMainThread(void(^block)())
 {
   if ([NSThread isMainThread]) {
-      @try {
-          block();
-      } @catch (NSException *e) {
-          [responder error:@{@"name": e.name, @"message": e.reason}];
-      } @catch (...) {
-          [responder error:@{@"name": @"Unknown", @"message": @"Unknown error caught when processing operation on main thread"}];
-      }
+    block();
   } else {
-      dispatch_async(dispatch_get_main_queue(), ^{
-          @try {
-              block();
-          } @catch (NSException *e) {
-              [responder error:@{@"name": e.name, @"message": e.reason}];
-          } @catch (...) {
-              [responder error:@{@"name": @"Unknown", @"message": @"Unknown error caught when processing operation on main thread"}];
-          }
-      });
+    dispatch_async(dispatch_get_main_queue(), block);
   }
 }

@@ -15,11 +15,9 @@
 #import <UIKit/UIKit.h>
 #include "SKStateUpdateCPPWrapper.h"
 #import "FlipperDiagnosticsViewController.h"
-#import "FlipperClient+Testing.h"
-#import "SKEnvironmentVariables.h"
 
 #if !TARGET_OS_SIMULATOR
-#import <FKPortForwarding/FKPortForwardingServer.h>
+//#import "SKPortForwardingServer.h"
 #endif
 
 using WrapperPlugin = facebook::flipper::FlipperCppWrapperPlugin;
@@ -29,8 +27,7 @@ using WrapperPlugin = facebook::flipper::FlipperCppWrapperPlugin;
   folly::ScopedEventBaseThread sonarThread;
   folly::ScopedEventBaseThread connectionThread;
 #if !TARGET_OS_SIMULATOR
- FKPortForwardingServer *_secureServer;
- FKPortForwardingServer *_insecureServer;
+ // SKPortForwardingServer *_server;
 #endif
 }
 
@@ -54,9 +51,8 @@ using WrapperPlugin = facebook::flipper::FlipperCppWrapperPlugin;
   if (self = [super init]) {
     UIDevice *device = [UIDevice currentDevice];
     NSString *deviceName = [device name];
-    NSBundle *bundle = [NSBundle mainBundle];
-    NSString *appName = [bundle objectForInfoDictionaryKey:(NSString *)kCFBundleNameKey];
-    NSString *appId = [bundle bundleIdentifier];
+    NSString *appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString *)kCFBundleNameKey];
+    NSString *appId = appName;
     NSString *privateAppDirectory = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES)[0];
 
     NSFileManager *manager = [NSFileManager defaultManager];
@@ -83,9 +79,7 @@ using WrapperPlugin = facebook::flipper::FlipperCppWrapperPlugin;
           [privateAppDirectory UTF8String],
         },
         sonarThread.getEventBase(),
-        connectionThread.getEventBase(),
-        [SKEnvironmentVariables getInsecurePort],
-        [SKEnvironmentVariables getSecurePort]
+        connectionThread.getEventBase()
       });
       _cppClient = facebook::flipper::FlipperClient::instance();
     } catch (const std::system_error &e) {
@@ -123,12 +117,9 @@ using WrapperPlugin = facebook::flipper::FlipperCppWrapperPlugin;
 - (void)start;
 {
 #if !TARGET_OS_SIMULATOR
-  _secureServer = [FKPortForwardingServer new];
-  [_secureServer forwardConnectionsFromPort:8088];
-  [_secureServer listenForMultiplexingChannelOnPort:8078];
-  _insecureServer = [FKPortForwardingServer new];
-  [_insecureServer forwardConnectionsFromPort:8089];
-  [_insecureServer listenForMultiplexingChannelOnPort:8079];
+  // _server = [SKPortForwardingServer new];
+  // [_server forwardConnectionsFromPort:8088];
+  // [_server listenForMultiplexingChannelOnPort:8078];
 #endif
   _cppClient->start();
 }
@@ -138,10 +129,8 @@ using WrapperPlugin = facebook::flipper::FlipperCppWrapperPlugin;
 {
   _cppClient->stop();
 #if !TARGET_OS_SIMULATOR
-  [_secureServer close];
-  _secureServer = nil;
-  [_insecureServer close];
-  _insecureServer = nil;
+  // [_server close];
+  // _server = nil;
 #endif
 }
 
@@ -183,17 +172,6 @@ using WrapperPlugin = facebook::flipper::FlipperCppWrapperPlugin;
 - (void)subscribeForUpdates:(id<FlipperStateUpdateListener>)controller {
   auto stateListener = std::make_shared<SKStateUpdateCPPWrapper>(controller);
   _cppClient->setStateListener(stateListener);
-}
-
-@end
-
-@implementation FlipperClient (Testing)
-
-- (instancetype)initWithCppClient:(facebook::flipper::FlipperClient *)cppClient {
-    if (self = [super init]) {
-        _cppClient = cppClient;
-    }
-    return self;
 }
 
 @end

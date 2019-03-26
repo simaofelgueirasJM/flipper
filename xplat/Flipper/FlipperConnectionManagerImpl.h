@@ -1,9 +1,11 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
+/*
+ *  Copyright (c) 2018-present, Facebook, Inc.
  *
- * This source code is licensed under the MIT license found in the LICENSE
- * file in the root directory of this source tree.
+ *  This source code is licensed under the MIT license found in the LICENSE
+ *  file in the root directory of this source tree.
+ *
  */
+
 #pragma once
 
 #include "FlipperInitConfig.h"
@@ -19,12 +21,11 @@ namespace flipper {
 
 class ConnectionEvents;
 class ConnectionContextStore;
-class FlipperRSocketResponder;
-
-rsocket::Payload toRSocketPayload(folly::dynamic data);
+class Responder;
 
 class FlipperConnectionManagerImpl : public FlipperConnectionManager {
   friend ConnectionEvents;
+  friend Responder;
 
  public:
   FlipperConnectionManagerImpl(FlipperInitConfig config, std::shared_ptr<FlipperState> state, std::shared_ptr<ConnectionContextStore> contextStore);
@@ -41,10 +42,6 @@ class FlipperConnectionManagerImpl : public FlipperConnectionManager {
 
   void sendMessage(const folly::dynamic& message) override;
 
-  void onMessageReceived(
-      const folly::dynamic& message,
-      std::unique_ptr<FlipperResponder> responder) override;
-
   void reconnect();
 
  private:
@@ -52,8 +49,6 @@ class FlipperConnectionManagerImpl : public FlipperConnectionManager {
   Callbacks* callbacks_;
   DeviceData deviceData_;
   std::shared_ptr<FlipperState> flipperState_;
-  int insecurePort;
-  int securePort;
 
   folly::EventBase* flipperEventBase_;
   folly::EventBase* connectionEventBase_;

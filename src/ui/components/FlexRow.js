@@ -8,9 +8,6 @@
 import FlexBox from './FlexBox.js';
 import styled from '../styled/index.js';
 
-/**
- * A container displaying its children in a row
- */
 export default styled(FlexBox)({
   flexDirection: 'row',
 });

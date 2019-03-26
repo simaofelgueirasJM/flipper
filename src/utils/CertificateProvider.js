@@ -5,21 +5,17 @@
  * @format
  */
 
-import type {Logger} from '../fb-interfaces/Logger';
+import LogManager from '../fb-stubs/Logger';
+import {RecurringError} from './errors';
 import {promisify} from 'util';
 const fs = require('fs');
+const adb = require('adbkit-fb');
 import {
   openssl,
   isInstalled as opensslInstalled,
 } from './openssl-wrapper-with-promises';
 const path = require('path');
-const tmp = require('tmp');
-const tmpFile = promisify(tmp.file);
-const tmpDir = promisify(tmp.dir);
-import iosUtil from '../fb-stubs/iOSContainerUtility';
-import {reportPlatformFailures} from './metrics';
-import {getAdbClient} from './adbClient';
-const adb = require('adbkit-fb');
+const tmpFile = promisify(require('tmp').file);
 
 // Desktop file paths
 const os = require('os');
@@ -27,7 +23,6 @@ const caKey = getFilePath('ca.key');
 const caCert = getFilePath('ca.crt');
 const serverKey = getFilePath('server.key');
 const serverCsr = getFilePath('server.csr');
-const serverSrl = getFilePath('server.srl');
 const serverCert = getFilePath('server.crt');
 
 // Device file paths
@@ -39,7 +34,7 @@ const caSubject = '/C=US/ST=CA/L=Menlo Park/O=Sonar/CN=SonarCA';
 const serverSubject = '/C=US/ST=CA/L=Menlo Park/O=Sonar/CN=localhost';
 const minCertExpiryWindowSeconds = 24 * 60 * 60;
 const appNotDebuggableRegex = /debuggable/;
-const allowedAppNameRegex = /^[a-zA-Z0-9._\-]+$/;
+const allowedAppNameRegex = /^[a-zA-Z0-9.\-]+$/;
 const operationNotPermittedRegex = /not permitted/;
 const logTag = 'CertificateProvider';
 /*
@@ -67,32 +62,25 @@ export type SecureServerConfig = {|
  * It also deploys the Flipper CA cert to the app.
  * The app can trust a server if and only if it has a certificate signed by the
  * Flipper CA.
- */
+*/
 export default class CertificateProvider {
-  logger: Logger;
-  adb: Promise<any>;
+  logger: LogManager;
+  adb: any;
   certificateSetup: Promise<void>;
   server: Server;
 
-  constructor(server: Server, logger: Logger) {
+  constructor(server: Server, logger: LogManager) {
     this.logger = logger;
-    this.adb = getAdbClient();
-    this.certificateSetup = reportPlatformFailures(
-      this.ensureServerCertExists(),
-      'ensureServerCertExists',
-    );
+    this.adb = adb.createClient();
+    this.certificateSetup = this.ensureServerCertExists();
     this.server = server;
   }
 
   processCertificateSigningRequest(
-    unsanitizedCsr: string,
+    csr: string,
     os: string,
     appDirectory: string,
   ): Promise<{|deviceId: string|}> {
-    const csr = this.santitizeString(unsanitizedCsr);
-    if (csr === '') {
-      return Promise.reject(new Error(`Received empty CSR from ${os} device`));
-    }
     this.ensureOpenSSLIsAvailable();
     return this.certificateSetup
       .then(_ => this.getCACertificate())
@@ -133,7 +121,15 @@ export default class CertificateProvider {
     if (os === 'Android') {
       return this.getTargetAndroidDeviceId(appName, appDirectory, csr);
     } else if (os === 'iOS') {
-      return this.getTargetiOSDeviceId(appName, appDirectory, csr);
+      const matches = /\/Devices\/([^/]+)\//.exec(appDirectory);
+      if (matches === null || matches.length < 2) {
+        return Promise.reject(
+          new Error(
+            `iOS simulator directory doesn't match expected format: ${appDirectory}`,
+          ),
+        );
+      }
+      return Promise.resolve(matches[1]);
     }
     return Promise.resolve('unknown');
   }
@@ -169,17 +165,8 @@ export default class CertificateProvider {
         CA: caCert,
         CAkey: caKey,
         CAcreateserial: true,
-        CAserial: serverSrl,
       });
     });
-  }
-
-  getRelativePathInAppContainer(absolutePath: string) {
-    const matches = /Application\/[^/]+\/(.*)/.exec(absolutePath);
-    if (matches && matches.length === 2) {
-      return matches[1];
-    }
-    throw new Error("Path didn't match expected pattern: " + absolutePath);
   }
 
   deployFileToMobileApp(
@@ -189,9 +176,8 @@ export default class CertificateProvider {
     csr: string,
     os: string,
   ): Promise<void> {
-    const appNamePromise = this.extractAppNameFromCSR(csr);
-
     if (os === 'Android') {
+      const appNamePromise = this.extractAppNameFromCSR(csr);
       const deviceIdPromise = appNamePromise.then(app =>
         this.getTargetAndroidDeviceId(app, destination, csr),
       );
@@ -206,52 +192,20 @@ export default class CertificateProvider {
       );
     }
     if (os === 'iOS' || os === 'windows') {
-      return promisify(fs.writeFile)(destination + filename, contents).catch(
-        err => {
-          if (os === 'iOS') {
-            // Writing directly to FS failed. It's probably a physical device.
-            const relativePathInsideApp = this.getRelativePathInAppContainer(
-              destination,
+      return new Promise((resolve, reject) => {
+        fs.writeFile(destination + filename, contents, err => {
+          if (err) {
+            reject(
+              `Invalid appDirectory recieved from ${os} device: ${destination}: ` +
+                err.toString(),
             );
-            return appNamePromise
-              .then(appName =>
-                this.getTargetiOSDeviceId(appName, destination, csr),
-              )
-              .then(udid => {
-                return appNamePromise.then(appName =>
-                  this.pushFileToiOSDevice(
-                    udid,
-                    appName,
-                    relativePathInsideApp,
-                    filename,
-                    contents,
-                  ),
-                );
-              });
+          } else {
+            resolve();
           }
-          throw new Error(
-            `Invalid appDirectory recieved from ${os} device: ${destination}: ` +
-              err.toString(),
-          );
-        },
-      );
+        });
+      });
     }
-    return Promise.reject(new Error(`Unsupported device os: ${os}`));
-  }
-
-  pushFileToiOSDevice(
-    udid: string,
-    bundleId: string,
-    destination: string,
-    filename: string,
-    contents: string,
-  ): Promise<void> {
-    return tmpDir({unsafeCleanup: true}).then(dir => {
-      const filePath = path.resolve(dir, filename);
-      promisify(fs.writeFile)(filePath, contents).then(() =>
-        iosUtil.push(udid, filePath, bundleId, destination),
-      );
-    });
+    return Promise.reject(new RecurringError(`Unsupported device os: ${os}`));
   }
 
   getTargetAndroidDeviceId(
@@ -259,68 +213,35 @@ export default class CertificateProvider {
     deviceCsrFilePath: string,
     csr: string,
   ): Promise<string> {
-    return this.adb
-      .then(client => client.listDevices())
-      .then((devices: Array<{id: string}>) => {
-        const deviceMatchList = devices.map(device =>
-          this.androidDeviceHasMatchingCSR(
-            deviceCsrFilePath,
-            device.id,
-            appName,
-            csr,
-          )
-            .then(isMatch => {
-              return {id: device.id, isMatch};
-            })
-            .catch(e => {
-              console.error(
-                `Unable to check for matching CSR in ${device.id}:${appName}`,
-                logTag,
-              );
-              return {id: device.id, isMatch: false};
-            }),
-        );
-        return Promise.all(deviceMatchList).then(devices => {
-          const matchingIds = devices.filter(m => m.isMatch).map(m => m.id);
-          if (matchingIds.length == 0) {
-            throw new Error(`No matching device found for app: ${appName}`);
-          }
-          if (matchingIds.length > 1) {
-            console.error(
-              new Error('More than one matching device found for CSR'),
-              csr,
-            );
-          }
-          return matchingIds[0];
-        });
-      });
-  }
-
-  getTargetiOSDeviceId(
-    appName: string,
-    deviceCsrFilePath: string,
-    csr: string,
-  ): Promise<string> {
-    const matches = /\/Devices\/([^/]+)\//.exec(deviceCsrFilePath);
-    if (matches && matches.length == 2) {
-      // It's a simulator, the deviceId is in the filepath.
-      return Promise.resolve(matches[1]);
-    }
-    return iosUtil.targets().then(targets => {
-      const deviceMatchList = targets.map(target =>
-        this.iOSDeviceHasMatchingCSR(
+    return this.adb.listDevices().then((devices: Array<{id: string}>) => {
+      const deviceMatchList = devices.map(device =>
+        // To find out which device requested the cert, search them
+        // all for a matching csr file.
+        // It's not important to keep these secret from other apps.
+        // Just need to make sure each app can find its own one.
+        this.androidDeviceHasMatchingCSR(
           deviceCsrFilePath,
-          target.udid,
+          device.id,
           appName,
           csr,
-        ).then(isMatch => {
-          return {id: target.udid, isMatch};
-        }),
+        )
+          .then(isMatch => {
+            return {id: device.id, isMatch};
+          })
+          .catch(e => {
+            console.error(
+              `Unable to check for matching CSR in ${device.id}:${appName}`,
+              logTag,
+            );
+            return {id: device.id, isMatch: false};
+          }),
       );
       return Promise.all(deviceMatchList).then(devices => {
         const matchingIds = devices.filter(m => m.isMatch).map(m => m.id);
         if (matchingIds.length == 0) {
-          throw new Error(`No matching device found for app: ${appName}`);
+          throw new RecurringError(
+            `No matching device found for app: ${appName}`,
+          );
         }
         return matchingIds[0];
       });
@@ -339,49 +260,17 @@ export default class CertificateProvider {
       `cat ${directory + csrFileName}`,
     )
       .then(deviceCsr => {
-        return this.santitizeString(deviceCsr.toString()) === csr;
+        return (
+          deviceCsr
+            .toString()
+            .replace(/\r/g, '')
+            .trim() === csr.replace(/\r/g, '').trim()
+        );
       })
       .catch(err => {
         console.error(err, logTag);
         return false;
       });
-  }
-
-  iOSDeviceHasMatchingCSR(
-    directory: string,
-    deviceId: string,
-    bundleId: string,
-    csr: string,
-  ): Promise<boolean> {
-    const originalFile = this.getRelativePathInAppContainer(
-      path.resolve(directory, csrFileName),
-    );
-    return tmpDir({unsafeCleanup: true})
-      .then(dir => {
-        return iosUtil
-          .pull(deviceId, originalFile, bundleId, dir)
-          .then(() => dir);
-      })
-      .then(dir => {
-        return promisify(fs.readdir)(dir)
-          .then(items => {
-            if (items.length !== 1) {
-              throw new Error('Conflict in temp dir');
-            }
-            return items[0];
-          })
-          .then(fileName => {
-            const copiedFile = path.resolve(dir, fileName);
-            return promisify(fs.readFile)(copiedFile).then(data =>
-              this.santitizeString(data.toString()),
-            );
-          });
-      })
-      .then(csrFromDevice => csrFromDevice === csr);
-  }
-
-  santitizeString(csrString: string): string {
-    return csrString.replace(/\r/g, '').trim();
   }
 
   pushFileToAndroidDevice(
@@ -404,29 +293,29 @@ export default class CertificateProvider {
     command: string,
   ): Promise<string> {
     if (!user.match(allowedAppNameRegex)) {
-      return Promise.reject(new Error(`Disallowed run-as user: ${user}`));
+      return Promise.reject(
+        new RecurringError(`Disallowed run-as user: ${user}`),
+      );
     }
     if (command.match(/[']/)) {
       return Promise.reject(
-        new Error(`Disallowed escaping command: ${command}`),
+        new RecurringError(`Disallowed escaping command: ${command}`),
       );
     }
     return this.adb
-      .then(client =>
-        client.shell(deviceId, `echo '${command}' | run-as '${user}'`),
-      )
+      .shell(deviceId, `echo '${command}' | run-as '${user}'`)
       .then(adb.util.readAll)
       .then(buffer => buffer.toString())
       .then(output => {
         if (output.match(appNotDebuggableRegex)) {
-          const e = new Error(
+          const e = new RecurringError(
             `Android app ${user} is not debuggable. To use it with Flipper, add android:debuggable="true" to the application section of AndroidManifest.xml`,
           );
           this.server.emit('error', e);
           throw e;
         }
         if (output.toLowerCase().match(operationNotPermittedRegex)) {
-          const e = new Error(
+          const e = new RecurringError(
             `Your android device (${deviceId}) does not support the adb shell run-as command. We're tracking this at https://github.com/facebook/flipper/issues/92`,
           );
           this.server.emit('error', e);
@@ -463,13 +352,13 @@ export default class CertificateProvider {
       .then(subject => {
         const matches = subject.trim().match(x509SubjectCNRegex);
         if (!matches || matches.length < 2) {
-          throw new Error(`Cannot extract CN from ${subject}`);
+          throw new RecurringError(`Cannot extract CN from ${subject}`);
         }
         return matches[1];
       })
       .then(appName => {
         if (!appName.match(allowedAppNameRegex)) {
-          throw new Error(
+          throw new RecurringError(
             `Disallowed app name in CSR: ${appName}. Only alphanumeric characters and '.' allowed.`,
           );
         }
@@ -611,7 +500,6 @@ export default class CertificateProvider {
           CA: caCert,
           CAkey: caKey,
           CAcreateserial: true,
-          CAserial: serverSrl,
           out: serverCert,
         }),
       )

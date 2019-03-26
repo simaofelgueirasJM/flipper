@@ -6,7 +6,6 @@
  */
 
 import type {TableHighlightedRows, TableRows, TableBodyRow} from 'flipper';
-import {padStart} from 'lodash';
 
 import {
   ContextMenu,
@@ -60,8 +59,6 @@ export type Header = {|
 |};
 
 const COLUMN_SIZE = {
-  requestTimestamp: 100,
-  responseTimestamp: 100,
   domain: 'flex',
   method: 100,
   status: 70,
@@ -69,23 +66,7 @@ const COLUMN_SIZE = {
   duration: 100,
 };
 
-const COLUMN_ORDER = [
-  {key: 'requestTimestamp', visible: true},
-  {key: 'responseTimestamp', visible: false},
-  {key: 'domain', visible: true},
-  {key: 'method', visible: true},
-  {key: 'status', visible: true},
-  {key: 'size', visible: true},
-  {key: 'duration', visible: true},
-];
-
 const COLUMNS = {
-  requestTimestamp: {
-    value: 'Request Time',
-  },
-  responseTimestamp: {
-    value: 'Response Time',
-  },
   domain: {
     value: 'Domain',
   },
@@ -131,6 +112,9 @@ const TextEllipsis = styled(Text)({
 });
 
 export default class extends FlipperPlugin<State, *, PersistedState> {
+  static title = 'Network';
+  static id = 'Network';
+  static icon = 'internet';
   static keyboardActions = ['clear'];
   static subscribed = [];
   static defaultPersistedState = {
@@ -159,11 +143,9 @@ export default class extends FlipperPlugin<State, *, PersistedState> {
     persistedState: PersistedState,
   ): Array<Notification> => {
     const responses = persistedState ? persistedState.responses || [] : [];
-    // $FlowFixMe Object.values returns Array<mixed>, but we know it is Array<Response>
-    const r: Array<Response> = Object.values(responses);
-
     return (
-      r
+      // $FlowFixMe Object.values returns Array<mixed>, but we know it is Array<Response>
+      (Object.values(responses): Array<Response>)
         // Show error messages for all status codes indicating a client or server error
         .filter((response: Response) => response.status >= 400)
         .map((response: Response) => ({
@@ -173,7 +155,7 @@ export default class extends FlipperPlugin<State, *, PersistedState> {
             '(URL missing)'}" failed. ${response.reason}`,
           severity: 'error',
           timestamp: response.timestamp,
-          category: `HTTP${response.status}`,
+          category: response.status,
           action: response.id,
         }))
     );
@@ -225,7 +207,7 @@ export default class extends FlipperPlugin<State, *, PersistedState> {
             this.state.selectedIds ? new Set(this.state.selectedIds) : null
           }
         />
-        <DetailSidebar width={500}>{this.renderSidebar()}</DetailSidebar>
+        <DetailSidebar>{this.renderSidebar()}</DetailSidebar>
       </FlexColumn>
     );
   }
@@ -243,19 +225,6 @@ type NetworkTableState = {|
   sortedRows: TableRows,
 |};
 
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp);
-  return `${padStart(date.getHours().toString(), 2, '0')}:${padStart(
-    date.getMinutes().toString(),
-    2,
-    '0',
-  )}:${padStart(date.getSeconds().toString(), 2, '0')}.${padStart(
-    date.getMilliseconds().toString(),
-    3,
-    '0',
-  )}`;
-}
-
 function buildRow(request: Request, response: ?Response): ?TableBodyRow {
   if (request == null) {
     return;
@@ -266,18 +235,6 @@ function buildRow(request: Request, response: ?Response): ?TableBodyRow {
 
   return {
     columns: {
-      requestTimestamp: {
-        value: (
-          <TextEllipsis>{formatTimestamp(request.timestamp)}</TextEllipsis>
-        ),
-      },
-      responseTimestamp: {
-        value: (
-          <TextEllipsis>
-            {response && formatTimestamp(response.timestamp)}
-          </TextEllipsis>
-        ),
-      },
       domain: {
         value: (
           <TextEllipsis>{friendlyName ? friendlyName : domain}</TextEllipsis>
@@ -402,7 +359,6 @@ class NetworkTable extends PureComponent<NetworkTableProps, NetworkTableState> {
           floating={false}
           columnSizes={COLUMN_SIZE}
           columns={COLUMNS}
-          columnOrder={COLUMN_ORDER}
           rows={this.state.sortedRows}
           onRowHighlighted={this.props.onRowHighlighted}
           highlightedRows={this.props.highlightedRows}
@@ -428,7 +384,7 @@ class StatusColumn extends PureComponent<{
     let glyph;
 
     if (children != null && children >= 400 && children < 600) {
-      glyph = <Icon name="stop" color={colors.red} />;
+      glyph = <Icon name="stop-solid" color={colors.red} />;
     }
 
     return (
@@ -490,9 +446,6 @@ class SizeColumn extends PureComponent<{
     if (lengthString != null && lengthString != '') {
       length = parseInt(lengthString, 10);
     } else if (response.data) {
-      // FIXME: T41427687 This is probably not the correct way to determine
-      // the correct byte size of the response, because String.length returns
-      // the number of characters, not bytes.
       length = atob(response.data).length;
     }
     return length;

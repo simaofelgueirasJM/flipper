@@ -7,6 +7,7 @@
 
 import {
   FlexRow,
+  Text,
   colors,
   LoadingIndicator,
   Glyph,
@@ -16,6 +17,13 @@ import {
 import {remote} from 'electron';
 import isProduction from '../utils/isProduction.js';
 import config from '../fb-stubs/config.js';
+const version = remote.app.getVersion();
+
+const VersionText = styled(Text)({
+  color: colors.light50,
+  marginLeft: 4,
+  marginTop: 2,
+});
 
 const Container = styled(FlexRow)({
   alignItems: 'center',
@@ -31,11 +39,7 @@ type State = {
   error?: string,
 };
 
-type Props = {
-  version: string,
-};
-
-export default class AutoUpdateVersion extends Component<Props, State> {
+export default class AutoUpdateVersion extends Component<{}, State> {
   state = {
     updater: 'update-not-available',
   };
@@ -45,7 +49,7 @@ export default class AutoUpdateVersion extends Component<Props, State> {
       // this will fail, if the app is not code signed
       try {
         remote.autoUpdater.setFeedURL({
-          url: `${config.updateServer}?version=${this.props.version}`,
+          url: `${config.updateServer}?version=${version}`,
         });
       } catch (e) {
         console.error(e);
@@ -103,6 +107,7 @@ export default class AutoUpdateVersion extends Component<Props, State> {
             <Glyph color={colors.light30} name="breaking-news" />
           </span>
         )}
+        {isProduction() && <VersionText>{version}</VersionText>}
       </Container>
     );
   }

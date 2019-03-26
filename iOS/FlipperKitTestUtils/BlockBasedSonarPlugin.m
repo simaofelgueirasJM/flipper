@@ -12,7 +12,6 @@
   NSString *_identifier;
   ConnectBlock _connect;
   DisconnectBlock _disconnect;
-  BOOL _runInBackground;
 }
 
 - (instancetype)initIdentifier:(NSString *)identifier connect:(ConnectBlock)connect disconnect:(DisconnectBlock)disconnect
@@ -21,19 +20,8 @@
     _identifier = identifier;
     _connect = connect;
     _disconnect = disconnect;
-    _runInBackground = false;
   }
   return self;
-}
-
-- (instancetype)initIdentifier:(NSString *)identifier connect:(ConnectBlock)connect disconnect:(DisconnectBlock)disconnect runInBackground:(BOOL)runInBackground {
-    if (self = [super init]) {
-        _identifier = identifier;
-        _connect = connect;
-        _disconnect = disconnect;
-        _runInBackground = runInBackground;
-    }
-    return self;
 }
 
 - (NSString *)identifier
@@ -50,13 +38,9 @@
 
 - (void)didDisconnect
 {
-  if (_disconnect) {
+  if (_connect) {
     _disconnect();
   }
-}
-
-- (BOOL)runInBackground {
-    return _runInBackground;
 }
 
 @end

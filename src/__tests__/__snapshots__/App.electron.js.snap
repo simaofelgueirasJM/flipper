@@ -5,16 +5,17 @@ exports[`Empty app state matches snapshot 1`] = `
   className="css-1si6n3e"
 >
   <div
-    className="toolbar css-78eqwq"
+    className="toolbar css-1u64wvw"
   >
     <div
-      className="css-q7gju5"
+      className="css-7nzs1f"
+      disabled={false}
       onClick={[Function]}
       onMouseDown={[Function]}
       onMouseUp={[Function]}
     >
       <div
-        className="css-1h9aj9a"
+        className="css-at56xe"
         color="#acacac"
         size={12}
         src="https://external.xx.fbcdn.net/assets/?name=minus-circle&variant=filled&size=12&set=facebook_icons&density=1x"
@@ -25,7 +26,7 @@ exports[`Empty app state matches snapshot 1`] = `
       className="css-1ayt83l"
     >
       <div
-        className="css-rb77sv"
+        className="css-1telx8z"
         disabled={true}
         onClick={[Function]}
         onMouseDown={[Function]}
@@ -33,14 +34,14 @@ exports[`Empty app state matches snapshot 1`] = `
         title="Take Screenshot"
       >
         <div
-          className="css-1dg3xuk"
+          className="css-11ecny9"
           color="#acacac"
           size={12}
           src="https://external.xx.fbcdn.net/assets/?name=camera&variant=filled&size=12&set=facebook_icons&density=1x"
         />
       </div>
       <div
-        className="css-rb77sv"
+        className="css-1telx8z"
         disabled={true}
         onClick={[Function]}
         onMouseDown={[Function]}
@@ -48,7 +49,7 @@ exports[`Empty app state matches snapshot 1`] = `
         title="Make Screen Recording"
       >
         <div
-          className="css-wvm62d"
+          className="css-1qxark3"
           color="#acacac"
           size={12}
           src="https://external.xx.fbcdn.net/assets/?name=camcorder&variant=filled&size=12&set=facebook_icons&density=1x"
@@ -58,21 +59,18 @@ exports[`Empty app state matches snapshot 1`] = `
     <div
       className="css-12zzrdt"
     />
-    <span
-      className="css-lli23c"
-    >
-      4.0.8
-      -dev
-    </span>
     <div
-      className="css-1cecbfb"
+      className="css-1xcv92o"
+    />
+    <div
+      className="css-1lljw3m"
       onClick={[Function]}
       onMouseDown={[Function]}
       onMouseUp={[Function]}
       title="Report Bug"
     >
       <div
-        className="css-1idwz0j"
+        className="css-1u10tgp"
         color="#acacac"
         size={12}
         src="https://external.xx.fbcdn.net/assets/?name=bug&variant=filled&size=12&set=facebook_icons&density=1x"
@@ -82,21 +80,21 @@ exports[`Empty app state matches snapshot 1`] = `
       className="css-1ayt83l"
     >
       <div
-        className="css-u1e6jr"
+        className="css-19m5dks"
         onClick={[Function]}
         onMouseDown={[Function]}
         onMouseUp={[Function]}
         title="Toggle Plugins"
       >
         <div
-          className="css-2bfl92"
+          className="css-1pfn0zl"
           color="#80a6f5"
           size={20}
           src="icons/sidebar_left.svg"
         />
       </div>
       <div
-        className="css-rb77sv"
+        className="css-1telx8z"
         disabled={true}
         onClick={[Function]}
         onMouseDown={[Function]}
@@ -104,25 +102,13 @@ exports[`Empty app state matches snapshot 1`] = `
         title="Toggle Details"
       >
         <div
-          className="css-j5i4pm"
+          className="css-13cmaba"
           color="#acacac"
           size={20}
           src="icons/sidebar_right.svg"
         />
       </div>
     </div>
-  </div>
-  <div
-    className="css-6xnt2s"
-  >
-    <div
-      id="pluginSheetContents"
-      style={
-        Object {
-          "display": "none",
-        }
-      }
-    />
   </div>
   <div
     className="css-9qtipk"
@@ -152,7 +138,7 @@ exports[`Empty app state matches snapshot 1`] = `
           onClick={[Function]}
         >
           <div
-            className="css-1hjpcq0"
+            className="css-1wavjrl"
             color="#8155cb"
             size={20}
             src="https://external.xx.fbcdn.net/assets/?name=rocket&variant=filled&size=20&set=facebook_icons&density=1x"
@@ -177,7 +163,7 @@ exports[`Empty app state matches snapshot 1`] = `
           onClick={[Function]}
         >
           <div
-            className="css-yfo7mj"
+            className="css-1bmw9ne"
             color="#8155cb"
             size={20}
             src="https://external.xx.fbcdn.net/assets/?name=magic-wand&variant=filled&size=20&set=facebook_icons&density=1x"
@@ -202,7 +188,7 @@ exports[`Empty app state matches snapshot 1`] = `
           onClick={[Function]}
         >
           <div
-            className="css-4qdej8"
+            className="css-nk9hkx"
             color="#8155cb"
             size={20}
             src="https://external.xx.fbcdn.net/assets/?name=tools&variant=filled&size=20&set=facebook_icons&density=1x"
@@ -227,7 +213,7 @@ exports[`Empty app state matches snapshot 1`] = `
           onClick={[Function]}
         >
           <div
-            className="css-l82yfp"
+            className="css-14xjmfa"
             color="#8155cb"
             size={20}
             src="https://external.xx.fbcdn.net/assets/?name=posts&variant=filled&size=20&set=facebook_icons&density=1x"

@@ -5,8 +5,8 @@
  * @format
  */
 
-import {init as initLogger} from '../fb-stubs/Logger';
-import Server from '../server';
+import Server, {SECURE_PORT, INSECURE_PORT} from '../server.js';
+import LogManager from '../fb-stubs/Logger';
 import reducers from '../reducers/index.js';
 import configureStore from 'redux-mock-store';
 import path from 'path';
@@ -23,16 +23,14 @@ beforeAll(() => {
     fs.mkdirSync(flipperDir);
   }
 
-  const logger = initLogger(mockStore);
-  server = new Server(logger, mockStore);
+  server = new Server(new LogManager(), mockStore);
+  return server.init();
 });
 
 test('servers starting at ports', done => {
-  const ports = mockStore.getState().application.serverPorts;
-  const serversToBeStarted = new Set([ports.secure, ports.insecure]);
+  const serversToBeStarted = new Set([SECURE_PORT, INSECURE_PORT]);
 
-  // Resolve promise when we get a listen event for each port
-  const listenerPromise = new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     server.addListener('listening', port => {
       if (!serversToBeStarted.has(port)) {
         throw Error(`unknown server started at port ${port}`);
@@ -45,11 +43,6 @@ test('servers starting at ports', done => {
       }
     });
   });
-
-  // Initialise server after the listeners have been setup
-  server.init();
-
-  return listenerPromise;
 });
 
 afterAll(() => {

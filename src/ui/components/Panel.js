@@ -112,7 +112,6 @@ export default class Panel extends React.Component<
     borderTop: 'none',
     flexGrow: 1,
     padding: props.padded ? 10 : 0,
-    overflow: 'visible',
   }));
   state = {
     collapsed: this.props.collapsed == null ? false : this.props.collapsed,
@@ -157,7 +156,6 @@ export default class Panel extends React.Component<
 
         {children == null || (collapsable && collapsed) ? null : (
           <Panel.PanelBody
-            scrollable
             grow={grow}
             padded={padded == null ? true : padded}
             floating={floating}>
